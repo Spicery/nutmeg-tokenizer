@@ -8,8 +8,8 @@ unittest:
 
 lint:
     echo "Running linter..."
-    @if command -v ~/.tools/bin/golangci-lint >/dev/null 2>&1; then \
-        ~/.tools/bin/golangci-lint run; \
+    @if command -v ~/.tools/ext/bin/golangci-lint >/dev/null 2>&1; then \
+        ~/.tools/ext/bin/golangci-lint run; \
     elif command -v golangci-lint >/dev/null 2>&1; then \
         golangci-lint run; \
     else \
@@ -18,19 +18,19 @@ lint:
         go vet ./...; \
     fi
 
-# Install golangci-lint to ~/.tools/bin
+# Install golangci-lint to ~/.tools/ext/bin  
 install-golangci-lint:
-    @mkdir -p ~/.tools/bin
-    GOBIN=~/.tools/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-    @echo "golangci-lint installed locally to this project in ~/.tools/bin/"
-    @echo "Note that ~/.tools/bin is not assumed to be in your PATH"
+    @mkdir -p ~/.tools/ext/bin
+    GOBIN=~/.tools/ext/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    @echo "golangci-lint installed locally to this project in ~/.tools/ext/bin/"
+    @echo "Note that ~/.tools/ext/bin is not assumed to be in your PATH"
 
 fmt:
     go fmt ./...
 
 # Check formatting without modifying files
 fmt-check:
-    ./.tools/scripts/go_fmt_dryrun.sh
+    ./.tools/repo/bin/go-fmt-check
 
 tidy:
     go mod tidy

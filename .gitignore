@@ -33,3 +33,6 @@ build/
 dist/
 /nutmeg-tokeniser
 /bin/
+
+# External tools (downloaded/installed, not committed)
+.tools/ext/
