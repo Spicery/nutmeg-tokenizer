@@ -11,16 +11,16 @@ the following token types:
     - n - Numeric literals which have a complex regex supporting radixes 2-36, decimal points, and scientific notation
     - s - String literals enclosed in single, double or back quotes, supporting escape sequences and interpolation
 - Identifier tokens matching the regex `[a-zA-Z_][a-zA-Z0-9_]*`
-    -   S - Start token (form start, e.g., def, if, while)
-    -   E - End token (form end, e.g., end, endif, endwhile)
-    -   C - Compound token (multi-part constructs)
-    -   L - Label token (identifiers used as labels)
-    -   P - Prefix token (operators that come before their operand) e.g. return, yield
-    -   V - Variable token (identifiers used as variables)
--   O - Operator token (infix, postfix operators) matching the regex `[\+\-\*/=<>!&|%^~]+`
--   [ - Open delimiter i.e. bracket/brace/parenthesis matching the regex `[\(\[\{]`
--   ] - Close delimiter i.e. bracket/brace/parenthesis matching the regex `[\)\]\}]`
--   U - Unclassified
+    -   S - Start token (form start, e.g., def, if, for)
+    -   E - End token (form end, e.g., end, endif, endfor)
+    -   C - Compound token (multi-part constructs e.g. `elseif`)
+    -   L - Label token (identifiers used as labels e.g. `then`, `else`)
+    -   P - Prefix token (operators that come before their operand) e.g. `return`, `yield`
+    -   V - Variable token (identifiers used as variables)
+-   O - Operator token (infix, postfix operators) matching the regex `[\+\-\*/=<>!&|%^~]+`
+-   [ - Open delimiter i.e. bracket/brace/parenthesis matching the regex `[\(\[\{]`
+-   ] - Close delimiter i.e. bracket/brace/parenthesis matching the regex `[\)\]\}]`
+-   U - Unclassified
 
 The tokeniser will ignore whitespace and comments, end of line comments starting
 with `###`.

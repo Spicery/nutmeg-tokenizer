@@ -11,11 +11,11 @@ the following token types:
     - n - Numeric literals which have a complex regex supporting radixes 2-36, decimal points, and scientific notation
     - s - String literals enclosed in single, double or back quotes, supporting escape sequences and interpolation
 - Identifier tokens matching the regex `[a-zA-Z_][a-zA-Z0-9_]*`
-    -   S - Start token (form start, e.g., def, if, while)
-    -   E - End token (form end, e.g., end, endif, endwhile)
-    -   C - Compound token (multi-part constructs)
-    -   L - Label token (identifiers used as labels)
-    -   P - Prefix token (operators that come before their operand) e.g. return, yield
+    -   S - Start token (form start, e.g., def, if, for)
+    -   E - End token (form end, e.g., end, endif, endfor)
+    -   C - Compound token (multi-part constructs e.g. `elseif`)
+    -   L - Label token (identifiers used as labels e.g. `then`, `else`)
+    -   P - Prefix token (operators that come before their operand) e.g. `return`, `yield`
     -   V - Variable token (identifiers used as variables)
 -   O - Operator token (infix, postfix operators) matching the regex `[\+\-\*/=<>!&|%^~]+`
 -   [ - Open delimiter i.e. bracket/brace/parenthesis matching the regex `[\(\[\{]`
@@ -47,7 +47,7 @@ Each token will be represented as a JSON object on a single line, with the follo
     - `expecting`: An array of token texts that can close this start token (e.g., `def` is closed by `end`)
 
 - Operator tokens will also have:
-    - precedence: 3 natural numbers indicating the prefix, infix and postfix precedences of the operator (0 if not a prefix operator)
+    - precedence: An array of 3 natural numbers indicating the prefix, infix and postfix precedences of the operator (0 if not a prefix operator)
 
 - `[` delimiter (bracket/brace/parenthesis) tokens will also have:
     - `closed_by`: The corresponding closing delimiter token text (e.g., `(` is closed by `)`)
