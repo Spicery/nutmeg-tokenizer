@@ -20,7 +20,6 @@ type Tokeniser struct {
 var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	operatorRegex   = regexp.MustCompile(`^[\+\-\*/=<>!&|%^~]+`)
-	openDelimRegex  = regexp.MustCompile(`^[\(\[\{]`)
 	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
 	numericRegex    = regexp.MustCompile(`^(?:0[bB][01]+|0[oO][0-7]+|0[xX][0-9a-fA-F]+|\d+)(?:\.\d*)?(?:[eE][+-]?\d+)?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
@@ -86,7 +85,7 @@ var delimiterMappings = map[string]string{
 var delimiterProperties = map[string][2]bool{
 	"(": {true, true},  // infix=true, prefix=true
 	"[": {true, false}, // infix=true, prefix=false
-	"{": {false, true}, // infix=false, prefix=true
+	"{": {true, true},  // infix=false, prefix=true
 }
 
 // New creates a new tokeniser instance.
