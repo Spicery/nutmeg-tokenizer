@@ -9,33 +9,66 @@ import (
 
 // Tokeniser represents the main tokeniser structure.
 type Tokeniser struct {
-	input    string
-	position int
-	line     int
-	column   int
-	tokens   []*Token
+	input          string
+	position       int
+	line           int
+	column         int
+	tokens         []*Token
+	expectingStack [][]string // Stack of expecting arrays for context tracking
 }
 
 // Regular expressions for token matching
 var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
-	operatorRegex   = regexp.MustCompile(`^[\+\-\*/=<>!&|%^~]+`)
+	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
 	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
 	numericRegex    = regexp.MustCompile(`^(?:0[bB][01]+|0[oO][0-7]+|0[xX][0-9a-fA-F]+|\d+)(?:\.\d*)?(?:[eE][+-]?\d+)?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
 )
 
-// Start token mappings
-var startTokens = map[string][]string{
-	"def":         {"end"},
-	"if":          {"end"},
-	"ifnot":       {"end"},
-	"fn":          {"end"},
-	"for":         {"end"},
-	"class":       {"end"},
-	"interface":   {"end"},
-	"try":         {"end"},
-	"transaction": {"end"},
+// Start token mappings with expecting and closed_by information
+type StartTokenData struct {
+	Expecting []string
+	ClosedBy  []string
+}
+
+var startTokens = map[string]StartTokenData{
+	"def": {
+		Expecting: []string{"=>>"},
+		ClosedBy:  []string{"end", "enddef"},
+	},
+	"if": {
+		Expecting: []string{"then"},
+		ClosedBy:  []string{"end", "endif"},
+	},
+	"ifnot": {
+		Expecting: []string{"then"},
+		ClosedBy:  []string{"end", "endifnot"},
+	},
+	"fn": {
+		Expecting: []string{},
+		ClosedBy:  []string{"end", "endfn"},
+	},
+	"for": {
+		Expecting: []string{"do"},
+		ClosedBy:  []string{"end", "endfor"},
+	},
+	"class": {
+		Expecting: []string{},
+		ClosedBy:  []string{"end", "endclass"},
+	},
+	"interface": {
+		Expecting: []string{},
+		ClosedBy:  []string{"end", "endinterface"},
+	},
+	"try": {
+		Expecting: []string{"catch", "else"},
+		ClosedBy:  []string{"end", "endtry"},
+	},
+	"transaction": {
+		Expecting: []string{"else"},
+		ClosedBy:  []string{"end", "endtransaction"},
+	},
 }
 
 // Label tokens (L) with their attributes
@@ -45,6 +78,14 @@ type LabelTokenData struct {
 }
 
 var labelTokens = map[string]LabelTokenData{
+	"=>>": {
+		Expecting: []string{"do"},
+		In:        []string{},
+	},
+	"do": {
+		Expecting: []string{},
+		In:        []string{"for", "def"},
+	},
 	"then": {
 		Expecting: []string{"else", "elseif", "elseifnot", "catch"},
 		In:        []string{"try", "if"},
@@ -82,28 +123,66 @@ var prefixTokens = map[string]bool{
 	"yield":  true,
 }
 
-// Operator precedence mappings
-var operatorPrecedence = map[string][3]int{
-	"+":  {0, 5, 0}, // prefix=0, infix=5, postfix=0
-	"-":  {8, 5, 0}, // prefix=8, infix=5, postfix=0
-	"*":  {0, 6, 0}, // prefix=0, infix=6, postfix=0
-	"/":  {0, 6, 0}, // prefix=0, infix=6, postfix=0
-	"=":  {0, 1, 0}, // prefix=0, infix=1, postfix=0
-	"<":  {0, 3, 0}, // prefix=0, infix=3, postfix=0
-	">":  {0, 3, 0}, // prefix=0, infix=3, postfix=0
-	"<=": {0, 3, 0}, // prefix=0, infix=3, postfix=0
-	">=": {0, 3, 0}, // prefix=0, infix=3, postfix=0
-	"==": {0, 2, 0}, // prefix=0, infix=2, postfix=0
-	"!=": {0, 2, 0}, // prefix=0, infix=2, postfix=0
-	"&&": {0, 1, 0}, // prefix=0, infix=1, postfix=0
-	"||": {0, 1, 0}, // prefix=0, infix=1, postfix=0
+// Base precedence values for operator characters (from operators.md)
+var baseOperatorPrecedence = map[rune]int{
+	'*': 10,
+	'/': 20,
+	'%': 30,
+	'+': 40,
+	'-': 50,
+	'<': 60,
+	'>': 70,
+	'~': 80,
+	'!': 90,
+	'&': 100,
+	'^': 110,
+	'|': 120,
+	'?': 130,
+	'=': 140,
+	':': 150,
 }
 
-// Delimiter mappings
-var delimiterMappings = map[string]string{
-	"(": ")",
-	"[": "]",
-	"{": "}",
+// calculateOperatorPrecedence calculates precedence based on rules in operators.md
+func calculateOperatorPrecedence(operator string) (prefix, infix, postfix int) {
+	if len(operator) == 0 {
+		return 0, 0, 0
+	}
+
+	firstChar := rune(operator[0])
+	basePrecedence, exists := baseOperatorPrecedence[firstChar]
+	if !exists {
+		// Fallback for unknown operators
+		basePrecedence = 1000
+	}
+
+	// If the first character is repeated, subtract 1
+	if len(operator) > 1 && rune(operator[1]) == firstChar {
+		basePrecedence--
+	}
+
+	// Role adjustments as per updated operators.md:
+	// - Only minus ("-") has prefix capability enabled (unary negation)
+	// - All operators have infix capability (add 2000 to base precedence)
+	// - No operators have postfix capability (set to 0)
+
+	if operator == "-" {
+		// Unary minus: enabled for both prefix and infix
+		prefix = basePrecedence
+		infix = basePrecedence + 2000
+		postfix = 0
+	} else {
+		// All other operators: only infix enabled
+		prefix = 0
+		infix = basePrecedence + 2000
+		postfix = 0
+	}
+
+	return prefix, infix, postfix
+} // Delimiter mappings
+var delimiterMappings = map[string][]string{
+	"(": {")"},
+	"[": {"]"},
+	"{": {"}"},
 }
 
 // Delimiter properties
@@ -116,14 +195,81 @@ var delimiterProperties = map[string][2]bool{
 // New creates a new tokeniser instance.
 func New(input string) *Tokeniser {
 	return &Tokeniser{
-		input:  input,
-		line:   1,
-		column: 1,
-		tokens: make([]*Token, 0),
+		input:          input,
+		line:           1,
+		column:         1,
+		tokens:         make([]*Token, 0),
+		expectingStack: make([][]string, 0),
 	}
 }
 
-// Tokenise processes the input and returns a slice of tokens.
+// pushExpecting pushes a new set of expected tokens onto the stack.
+func (t *Tokeniser) pushExpecting(expected []string) {
+	t.expectingStack = append(t.expectingStack, expected)
+}
+
+// popExpecting removes the top set of expected tokens from the stack.
+func (t *Tokeniser) popExpecting() {
+	if len(t.expectingStack) > 0 {
+		t.expectingStack = t.expectingStack[:len(t.expectingStack)-1]
+	}
+}
+
+// getCurrentlyExpected returns the currently expected tokens, or nil if stack is empty.
+func (t *Tokeniser) getCurrentlyExpected() []string {
+	if len(t.expectingStack) == 0 {
+		return nil
+	}
+	return t.expectingStack[len(t.expectingStack)-1]
+}
+
+// addTokenAndManageStack adds a token to the tokens slice and manages the expecting stack.
+func (t *Tokeniser) addTokenAndManageStack(token *Token) {
+	t.tokens = append(t.tokens, token)
+
+	// Manage the expecting stack based on token type and text
+	switch token.Type {
+	case StartToken:
+		// Push expected tokens for this start token
+		if len(token.Expecting) > 0 {
+			t.pushExpecting(token.Expecting)
+		}
+	case EndToken:
+		// Pop the expecting stack
+		t.popExpecting()
+	case LabelToken, CompoundToken:
+		// Update expecting for label and compound tokens based on their attributes
+		switch token.Text {
+		case "=>>":
+			// After =>> we expect do
+			t.pushExpecting([]string{"do"})
+		case "do":
+			// After do in "for x do" or "def f(x) =>> do", we expect end
+			t.popExpecting() // Remove the "do" expectation
+			t.pushExpecting([]string{"end"})
+		default:
+			// For other label/compound tokens, check if they have their own expectations
+			if labelData, exists := labelTokens[token.Text]; exists {
+				// Replace current expectations with what this label expects
+				if len(t.expectingStack) > 0 {
+					t.popExpecting() // Remove current expectations
+				}
+				if len(labelData.Expecting) > 0 {
+					t.pushExpecting(labelData.Expecting)
+				}
+				// If labelData.Expecting is empty, we leave the stack with nothing expected
+			} else if compoundData, exists := compoundTokens[token.Text]; exists {
+				// Handle compound tokens the same way
+				if len(t.expectingStack) > 0 {
+					t.popExpecting() // Remove current expectations
+				}
+				if len(compoundData.Expecting) > 0 {
+					t.pushExpecting(compoundData.Expecting)
+				}
+			}
+		}
+	}
+} // Tokenise processes the input and returns a slice of tokens.
 func (t *Tokeniser) Tokenise() ([]*Token, error) {
 	for t.position < len(t.input) {
 		if err := t.nextToken(); err != nil {
@@ -152,31 +298,37 @@ func (t *Tokeniser) nextToken() error {
 	// Try to match different token types
 	if token := t.matchString(); token != nil {
 		token.Span.Start = start
-		t.tokens = append(t.tokens, token)
+		t.addTokenAndManageStack(token)
 		return nil
 	}
 
 	if token := t.matchNumeric(); token != nil {
 		token.Span.Start = start
-		t.tokens = append(t.tokens, token)
+		t.addTokenAndManageStack(token)
 		return nil
 	}
 
 	if token := t.matchIdentifier(); token != nil {
 		token.Span.Start = start
-		t.tokens = append(t.tokens, token)
+		t.addTokenAndManageStack(token)
+		return nil
+	}
+
+	if token := t.matchSpecialLabels(); token != nil {
+		token.Span.Start = start
+		t.addTokenAndManageStack(token)
 		return nil
 	}
 
 	if token := t.matchOperator(); token != nil {
 		token.Span.Start = start
-		t.tokens = append(t.tokens, token)
+		t.addTokenAndManageStack(token)
 		return nil
 	}
 
 	if token := t.matchDelimiter(); token != nil {
 		token.Span.Start = start
-		t.tokens = append(t.tokens, token)
+		t.addTokenAndManageStack(token)
 		return nil
 	}
 
@@ -187,7 +339,7 @@ func (t *Tokeniser) nextToken() error {
 	span := Span{Start: start, End: end}
 
 	token := NewToken(text, UnclassifiedToken, span)
-	t.tokens = append(t.tokens, token)
+	t.addTokenAndManageStack(token)
 	t.advance(size)
 
 	return nil
@@ -328,19 +480,9 @@ func (t *Tokeniser) matchIdentifier() *Token {
 	var tokenType TokenType = VariableToken
 
 	// Check if it's a start token
-	if closedBy, isStart := startTokens[match]; isStart {
-		// Create the full closed_by list including end{TEXT} and end
-		fullClosedBy := make([]string, 0, len(closedBy)+1)
-
-		// Add the specific end token (e.g., "enddef" for "def")
-		endSpecific := "end" + match
-		fullClosedBy = append(fullClosedBy, endSpecific)
-
-		// Add all the configured closing tokens
-		fullClosedBy = append(fullClosedBy, closedBy...)
-
+	if startData, isStart := startTokens[match]; isStart {
 		t.advance(len(match))
-		return NewStartToken(match, fullClosedBy, span)
+		return NewStartToken(match, startData.Expecting, startData.ClosedBy, span)
 	}
 
 	// Check if it's an end token
@@ -364,6 +506,62 @@ func (t *Tokeniser) matchIdentifier() *Token {
 	return NewToken(match, tokenType, span)
 }
 
+// matchSpecialLabels attempts to match special label sequences like '=>>' and wildcard ':'
+func (t *Tokeniser) matchSpecialLabels() *Token {
+	// Check for '=>>' special label
+	if strings.HasPrefix(t.input[t.position:], "=>>") {
+		end := Position{Line: t.line, Col: t.column + 3}
+		span := Span{End: end}
+
+		labelData := labelTokens["=>>"]
+		t.advance(3)
+		return NewLabelToken("=>>", labelData.Expecting, labelData.In, span)
+	}
+
+	// Check for wildcard ':'
+	if t.position < len(t.input) && t.input[t.position] == ':' {
+		// Make sure it's a single ':' and not part of a longer operator
+		if t.position+1 >= len(t.input) || !strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
+			end := Position{Line: t.line, Col: t.column + 1}
+			span := Span{End: end}
+
+			// Check if we have context from the expecting stack
+			expected := t.getCurrentlyExpected()
+			if len(expected) > 0 {
+				// Use the first expected token as the basis for the wildcard
+				expectedText := expected[0]
+
+				// Check if it's a label token
+				if labelData, exists := labelTokens[expectedText]; exists {
+					// Create a wildcard token that copies attributes from the expected label
+					t.advance(1)
+					return NewWildcardLabelTokenWithAttributes(":", expectedText, labelData.Expecting, labelData.In, span)
+				}
+
+				// Check if it's a start token
+				if startData, exists := startTokens[expectedText]; exists {
+					// Create wildcard start token
+					t.advance(1)
+					return NewWildcardStartToken(":", expectedText, startData.ClosedBy, span)
+				}
+
+				// Check if it's an end token (starts with "end")
+				if strings.HasPrefix(expectedText, "end") {
+					// Create wildcard end token
+					t.advance(1)
+					return NewWildcardEndToken(":", expectedText, span)
+				}
+			}
+
+			// No context available, create unclassified token
+			t.advance(1)
+			return NewToken(":", UnclassifiedToken, span)
+		}
+	}
+
+	return nil
+}
+
 // matchOperator attempts to match an operator.
 func (t *Tokeniser) matchOperator() *Token {
 	match := operatorRegex.FindString(t.input[t.position:])
@@ -371,29 +569,29 @@ func (t *Tokeniser) matchOperator() *Token {
 		return nil
 	}
 
-	// Try to find the longest matching operator
-	longestMatch := ""
-	for op := range operatorPrecedence {
-		if strings.HasPrefix(match, op) && len(op) > len(longestMatch) {
-			longestMatch = op
-		}
+	// Special case: single ':' is treated as a wildcard simple-label, not an operator
+	if match == ":" {
+		// This should be handled elsewhere as a label token
+		return nil
 	}
 
-	if longestMatch == "" {
-		longestMatch = match
+	// Special case: '=>>' is treated as a simple-label, not an operator
+	if strings.HasPrefix(match, "=>>") {
+		// This should be handled elsewhere as a label token
+		return nil
 	}
 
-	end := Position{Line: t.line, Col: t.column + len(longestMatch)}
+	// Use the entire match as the operator (greedy matching)
+	operator := match
+
+	end := Position{Line: t.line, Col: t.column + len(operator)}
 	span := Span{End: end}
 
-	precedence, exists := operatorPrecedence[longestMatch]
-	var prefix, infix, postfix int
-	if exists {
-		prefix, infix, postfix = precedence[0], precedence[1], precedence[2]
-	}
+	// Calculate precedence using the new rules
+	prefix, infix, postfix := calculateOperatorPrecedence(operator)
 
-	t.advance(len(longestMatch))
-	return NewOperatorToken(longestMatch, prefix, infix, postfix, span)
+	t.advance(len(operator))
+	return NewOperatorToken(operator, prefix, infix, postfix, span)
 }
 
 // matchDelimiter attempts to match a delimiter.

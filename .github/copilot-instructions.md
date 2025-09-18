@@ -17,7 +17,7 @@ the following token types:
     -   L - Label token (identifiers used as labels e.g. `then`, `else`)
     -   P - Prefix token (operators that come before their operand) e.g. `return`, `yield`
     -   V - Variable token (identifiers used as variables)
--   O - Operator token (infix, postfix operators) matching the regex `[\+\-\*/=<>!&|%^~]+`
+-   O - Operator token (infix, postfix operators) matching the regex `[\*\/\%\+\-\<\>\~\!\&\^\|\?\:\=]+`
 -   [ - Open delimiter i.e. bracket/brace/parenthesis matching the regex `[\(\[\{]`
 -   ] - Close delimiter i.e. bracket/brace/parenthesis matching the regex `[\)\]\}]`
 -   U - Unclassified
@@ -44,13 +44,13 @@ Each token will be represented as a JSON object on a single line, with the follo
     - `exponent`: The exponent part of numeric literals as a string (if any) as a decimal integer
 
 - Start tokens will also have:
-    - `expecting`: An array of token texts that can close this start token (e.g., `def` is closed by `end`)
+    - `closed_by`: An array of token texts that can close this start token (e.g., `def` is closed by `end`)
 
 - Operator tokens will also have:
     - precedence: An array of 3 natural numbers indicating the prefix, infix and postfix precedences of the operator (0 if not a prefix operator)
 
 - `[` delimiter (bracket/brace/parenthesis) tokens will also have:
-    - `closed_by`: The corresponding closing delimiter token text (e.g., `(` is closed by `)`)
+    - `closed_by`: The corresponding possible closing delimiter token text (e.g., `(` is closed by [`)`])
     - `infix`: A boolean indicating if the delimiter can be used as an infix operator (e.g., `[` can be used as an infix operator for array indexing)
     - `prefix`: A boolean indicating if the delimiter can be used as a prefix operator (e.g., `(` can be used as a prefix operator for grouping expressions)
 

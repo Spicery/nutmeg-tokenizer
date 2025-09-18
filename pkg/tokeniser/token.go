@@ -71,16 +71,16 @@ type Token struct {
 	Exponent *string `json:"exponent,omitempty"`
 
 	// Start token, Label token, and Compound token fields
-	Expecting []string `json:"expecting,omitempty"` // For start tokens (what can close them) and label/compound tokens (what can follow them)
+	Expecting []string `json:"expecting,omitempty"` // For start tokens (immediate next tokens) and label/compound tokens (what can follow them)
 	In        []string `json:"in,omitempty"`        // For label and compound tokens - what can contain them
+	ClosedBy  []string `json:"closed_by,omitempty"` // For start tokens and delimiter tokens - what can close them
 
 	// Operator token fields
 	Precedence *[3]int `json:"precedence,omitempty"` // [prefix, infix, postfix] precedence values
 
 	// Delimiter fields (for '[' tokens)
-	ClosedBy *string `json:"closed_by,omitempty"` // For delimiter tokens
-	Infix    *bool   `json:"infix,omitempty"`     // For delimiter infix usage
-	Prefix   *bool   `json:"prefix,omitempty"`    // For delimiter prefix usage
+	Infix  *bool `json:"infix,omitempty"`  // For delimiter infix usage
+	Prefix *bool `json:"prefix,omitempty"` // For delimiter prefix usage
 }
 
 // NewToken creates a new token with the basic required fields.
@@ -122,13 +122,14 @@ func NewNumericToken(text string, radix int, mantissa, fraction, exponent string
 	return token
 }
 
-// NewStartToken creates a new start token with expected closing tokens.
-func NewStartToken(text string, expecting []string, span Span) *Token {
+// NewStartToken creates a new start token with expecting and closed_by tokens.
+func NewStartToken(text string, expecting, closedBy []string, span Span) *Token {
 	return &Token{
 		Text:      text,
 		Type:      StartToken,
 		Span:      span,
 		Expecting: expecting,
+		ClosedBy:  closedBy,
 	}
 }
 
@@ -150,12 +151,12 @@ func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token
 }
 
 // NewDelimiterToken creates a new open delimiter token.
-func NewDelimiterToken(text, closedBy string, isInfix, isPrefix bool, span Span) *Token {
+func NewDelimiterToken(text string, closedBy []string, isInfix, isPrefix bool, span Span) *Token {
 	return &Token{
 		Text:     text,
 		Type:     OpenDelimiter,
 		Span:     span,
-		ClosedBy: &closedBy,
+		ClosedBy: closedBy,
 		Infix:    &isInfix,
 		Prefix:   &isPrefix,
 	}
@@ -180,5 +181,51 @@ func NewCompoundToken(text string, expecting, in []string, span Span) *Token {
 		Span:      span,
 		Expecting: expecting,
 		In:        in,
+	}
+}
+
+// NewWildcardLabelToken creates a new wildcard label token.
+// For now, this creates a basic label token. The context-dependent logic
+// to copy attributes from expected tokens will be implemented later.
+func NewWildcardLabelToken(text string, span Span) *Token {
+	value := ""
+	return &Token{
+		Text:  text,
+		Type:  LabelToken,
+		Span:  span,
+		Value: &value,
+	}
+}
+
+// NewWildcardLabelTokenWithAttributes creates a wildcard label token with copied attributes.
+func NewWildcardLabelTokenWithAttributes(text, expectedText string, expecting, in []string, span Span) *Token {
+	return &Token{
+		Text:      text,
+		Type:      LabelToken,
+		Span:      span,
+		Expecting: expecting,
+		In:        in,
+		Value:     &expectedText,
+	}
+}
+
+// NewWildcardStartToken creates a wildcard start token with copied attributes.
+func NewWildcardStartToken(text, expectedText string, closedBy []string, span Span) *Token {
+	return &Token{
+		Text:     text,
+		Type:     StartToken,
+		Span:     span,
+		ClosedBy: closedBy,
+		Value:    &expectedText,
+	}
+}
+
+// NewWildcardEndToken creates a wildcard end token.
+func NewWildcardEndToken(text, expectedText string, span Span) *Token {
+	return &Token{
+		Text:  text,
+		Type:  EndToken,
+		Span:  span,
+		Value: &expectedText,
 	}
 }

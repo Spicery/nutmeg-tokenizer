@@ -161,12 +161,13 @@ func TestStartTokens(t *testing.T) {
 		expectedType TokenType
 		expecting    []string
 	}{
-		{"def", StartToken, []string{"enddef", "end"}},
-		{"if", StartToken, []string{"endif", "end"}},
-		{"class", StartToken, []string{"endclass", "end"}},
-		{"fn", StartToken, []string{"endfn", "end"}},
-		{"try", StartToken, []string{"endtry", "end"}},
-		{"transaction", StartToken, []string{"endtransaction", "end"}},
+		{"def", StartToken, []string{"=>>"}},
+		{"if", StartToken, []string{"then"}},
+		{"class", StartToken, []string{}},
+		{"fn", StartToken, []string{}},
+		{"for", StartToken, []string{"do"}},
+		{"try", StartToken, []string{"catch", "else"}},
+		{"transaction", StartToken, []string{"else"}},
 	}
 
 	for _, tt := range tests {
@@ -208,10 +209,10 @@ func TestOperatorTokens(t *testing.T) {
 		input              string
 		expectedPrecedence [3]int // [prefix, infix, postfix]
 	}{
-		{"+", [3]int{0, 5, 0}},
-		{"-", [3]int{8, 5, 0}},
-		{"*", [3]int{0, 6, 0}},
-		{"==", [3]int{0, 2, 0}},
+		{"+", [3]int{0, 2040, 0}},  // + has base precedence 40, only infix enabled (40+2000=2040)
+		{"-", [3]int{50, 2050, 0}}, // - has base precedence 50, both prefix (50) and infix (50+2000=2050) enabled
+		{"*", [3]int{0, 2010, 0}},  // * has base precedence 10, only infix enabled (10+2000=2010)
+		{"==", [3]int{0, 2139, 0}}, // = has base precedence 140, repeated so 139, only infix enabled (139+2000=2139)
 	}
 
 	for _, tt := range tests {
@@ -250,16 +251,16 @@ func TestDelimiterTokens(t *testing.T) {
 	tests := []struct {
 		input        string
 		expectedType TokenType
-		closedBy     string
+		closedBy     []string
 		isInfix      bool
 		isPrefix     bool
 	}{
-		{"(", OpenDelimiter, ")", true, true},
-		{"[", OpenDelimiter, "]", true, false},
-		{"{", OpenDelimiter, "}", true, true}, // Updated: now supports infix usage for f{x} syntax
-		{")", CloseDelimiter, "", false, false},
-		{"]", CloseDelimiter, "", false, false},
-		{"}", CloseDelimiter, "", false, false},
+		{"(", OpenDelimiter, []string{")"}, true, true},
+		{"[", OpenDelimiter, []string{"]"}, true, false},
+		{"{", OpenDelimiter, []string{"}"}, true, true}, // Updated: now supports infix usage for f{x} syntax
+		{")", CloseDelimiter, nil, false, false},
+		{"]", CloseDelimiter, nil, false, false},
+		{"}", CloseDelimiter, nil, false, false},
 	}
 
 	for _, tt := range tests {
@@ -283,8 +284,14 @@ func TestDelimiterTokens(t *testing.T) {
 			}
 
 			if tt.expectedType == OpenDelimiter {
-				if token.ClosedBy == nil || *token.ClosedBy != tt.closedBy {
-					t.Errorf("Expected closed by '%s', got %v", tt.closedBy, token.ClosedBy)
+				if len(token.ClosedBy) != len(tt.closedBy) {
+					t.Errorf("Expected closed by %v, got %v", tt.closedBy, token.ClosedBy)
+				} else {
+					for i, expected := range tt.closedBy {
+						if token.ClosedBy[i] != expected {
+							t.Errorf("Expected closed by '%s' at index %d, got '%s'", expected, i, token.ClosedBy[i])
+						}
+					}
 				}
 
 				if token.Infix == nil || *token.Infix != tt.isInfix {
@@ -305,8 +312,13 @@ func TestKeywordClassification(t *testing.T) {
 		expectedType TokenType
 	}{
 		// Label tokens (L)
+		{"=>>", LabelToken},
+		{"do", LabelToken},
 		{"then", LabelToken},
 		{"else", LabelToken},
+
+		// Unclassified tokens (U)
+		{":", UnclassifiedToken}, // bare wildcard without context
 
 		// Compound tokens (C)
 		{"catch", CompoundToken},

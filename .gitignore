@@ -31,3 +31,4 @@ tmp/
 # Build output
 build/
 dist/
+/nutmeg-tokeniser
