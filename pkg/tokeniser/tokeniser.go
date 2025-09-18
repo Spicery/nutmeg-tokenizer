@@ -28,28 +28,51 @@ var (
 
 // Start token mappings
 var startTokens = map[string][]string{
-	"def":   {"end"},
-	"if":    {"endif", "end"},
-	"while": {"endwhile", "end"},
-	"for":   {"endfor", "end"},
-	"try":   {"endtry", "end"},
+	"def":         {"end"},
+	"if":          {"end"},
+	"ifnot":       {"end"},
+	"fn":          {"end"},
+	"for":         {"end"},
+	"class":       {"end"},
+	"interface":   {"end"},
+	"try":         {"end"},
+	"transaction": {"end"},
+}
+
+// Label tokens (L)
+var labelTokens = map[string]bool{
+	"then": true,
+	"else": true,
+}
+
+// Compound tokens (C)
+var compoundTokens = map[string]bool{
+	"catch":     true,
+	"elseif":    true,
+	"elseifnot": true,
+}
+
+// Prefix tokens (P)
+var prefixTokens = map[string]bool{
+	"return": true,
+	"yield":  true,
 }
 
 // Operator precedence mappings
 var operatorPrecedence = map[string][3]int{
-	"+":  {0, 5, 0},  // prefix=0, infix=5, postfix=0
-	"-":  {8, 5, 0},  // prefix=8, infix=5, postfix=0
-	"*":  {0, 6, 0},  // prefix=0, infix=6, postfix=0
-	"/":  {0, 6, 0},  // prefix=0, infix=6, postfix=0
-	"=":  {0, 1, 0},  // prefix=0, infix=1, postfix=0
-	"<":  {0, 3, 0},  // prefix=0, infix=3, postfix=0
-	">":  {0, 3, 0},  // prefix=0, infix=3, postfix=0
-	"<=": {0, 3, 0},  // prefix=0, infix=3, postfix=0
-	">=": {0, 3, 0},  // prefix=0, infix=3, postfix=0
-	"==": {0, 2, 0},  // prefix=0, infix=2, postfix=0
-	"!=": {0, 2, 0},  // prefix=0, infix=2, postfix=0
-	"&&": {0, 1, 0},  // prefix=0, infix=1, postfix=0
-	"||": {0, 1, 0},  // prefix=0, infix=1, postfix=0
+	"+":  {0, 5, 0}, // prefix=0, infix=5, postfix=0
+	"-":  {8, 5, 0}, // prefix=8, infix=5, postfix=0
+	"*":  {0, 6, 0}, // prefix=0, infix=6, postfix=0
+	"/":  {0, 6, 0}, // prefix=0, infix=6, postfix=0
+	"=":  {0, 1, 0}, // prefix=0, infix=1, postfix=0
+	"<":  {0, 3, 0}, // prefix=0, infix=3, postfix=0
+	">":  {0, 3, 0}, // prefix=0, infix=3, postfix=0
+	"<=": {0, 3, 0}, // prefix=0, infix=3, postfix=0
+	">=": {0, 3, 0}, // prefix=0, infix=3, postfix=0
+	"==": {0, 2, 0}, // prefix=0, infix=2, postfix=0
+	"!=": {0, 2, 0}, // prefix=0, infix=2, postfix=0
+	"&&": {0, 1, 0}, // prefix=0, infix=1, postfix=0
+	"||": {0, 1, 0}, // prefix=0, infix=1, postfix=0
 }
 
 // Delimiter mappings
@@ -61,9 +84,9 @@ var delimiterMappings = map[string]string{
 
 // Delimiter properties
 var delimiterProperties = map[string][2]bool{
-	"(": {true, true},   // infix=true, prefix=true
-	"[": {true, false},  // infix=true, prefix=false
-	"{": {false, true},  // infix=false, prefix=true
+	"(": {true, true},  // infix=true, prefix=true
+	"[": {true, false}, // infix=true, prefix=false
+	"{": {false, true}, // infix=false, prefix=true
 }
 
 // New creates a new tokeniser instance.
@@ -282,17 +305,34 @@ func (t *Tokeniser) matchIdentifier() *Token {
 
 	// Check if it's a start token
 	if closedBy, isStart := startTokens[match]; isStart {
+		// Create the full closed_by list including end{TEXT} and end
+		fullClosedBy := make([]string, 0, len(closedBy)+1)
+
+		// Add the specific end token (e.g., "enddef" for "def")
+		endSpecific := "end" + match
+		fullClosedBy = append(fullClosedBy, endSpecific)
+
+		// Add all the configured closing tokens
+		fullClosedBy = append(fullClosedBy, closedBy...)
+
 		t.advance(len(match))
-		return NewStartToken(match, closedBy, span)
+		return NewStartToken(match, fullClosedBy, span)
 	}
 
 	// Check if it's an end token
 	if strings.HasPrefix(match, "end") {
 		tokenType = EndToken
+	} else if labelTokens[match] {
+		// Check if it's a label token (L)
+		tokenType = LabelToken
+	} else if compoundTokens[match] {
+		// Check if it's a compound token (C)
+		tokenType = CompoundToken
+	} else if prefixTokens[match] {
+		// Check if it's a prefix token (P)
+		tokenType = PrefixToken
 	}
-
-	// For now, classify other identifiers as variables
-	// This could be enhanced with more sophisticated classification
+	// Otherwise, default to VariableToken
 
 	t.advance(len(match))
 	return NewToken(match, tokenType, span)

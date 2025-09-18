@@ -15,17 +15,20 @@ const (
 	usage   = `nutmeg-tokeniser - A tokeniser for the Nutmeg programming language
 
 Usage:
-  nutmeg-tokeniser [options] [file]
+  nutmeg-tokeniser [options]
 
 Options:
-  -h, --help     Show this help message
-  -v, --version  Show version information
-  -             Read from stdin instead of a file
+  -h, --help            Show this help message
+  -v, --version         Show version information
+  --input <file>        Input file (defaults to stdin)
+  --output <file>       Output file (defaults to stdout)
 
 Examples:
-  nutmeg-tokeniser source.nutmeg    # Tokenise a file
-  nutmeg-tokeniser -                # Read from stdin
-  echo "def foo end" | nutmeg-tokeniser -
+  nutmeg-tokeniser                                    # Read from stdin, write to stdout
+  nutmeg-tokeniser --input source.nutmeg             # Read from file, write to stdout
+  nutmeg-tokeniser --output tokens.json              # Read from stdin, write to file
+  nutmeg-tokeniser --input source.nutmeg --output tokens.json  # Read from file, write to file
+  echo "def foo end" | nutmeg-tokeniser              # Read from stdin, write to stdout
 
 The tokeniser outputs one JSON token object per line.
 `
@@ -33,10 +36,14 @@ The tokeniser outputs one JSON token object per line.
 
 func main() {
 	var showHelp, showVersion bool
+	var inputFile, outputFile string
+
 	flag.BoolVar(&showHelp, "h", false, "Show help")
 	flag.BoolVar(&showHelp, "help", false, "Show help")
 	flag.BoolVar(&showVersion, "v", false, "Show version")
 	flag.BoolVar(&showVersion, "version", false, "Show version")
+	flag.StringVar(&inputFile, "input", "", "Input file (defaults to stdin)")
+	flag.StringVar(&outputFile, "output", "", "Output file (defaults to stdout)")
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, usage)
@@ -54,29 +61,31 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Reject any positional arguments
+	if len(flag.Args()) > 0 {
+		fmt.Fprintf(os.Stderr, "Error: Unexpected positional arguments. Use --input and --output flags instead.\n\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	var input string
 	var err error
 
-	args := flag.Args()
-
-	if len(args) == 0 || (len(args) == 1 && args[0] == "-") {
+	// Read input
+	if inputFile == "" {
 		// Read from stdin
 		input, err = readFromStdin()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error reading from stdin: %v\n", err)
 			os.Exit(1)
 		}
-	} else if len(args) == 1 {
+	} else {
 		// Read from file
-		input, err = readFromFile(args[0])
+		input, err = readFromFile(inputFile)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading file '%s': %v\n", args[0], err)
+			fmt.Fprintf(os.Stderr, "Error reading file '%s': %v\n", inputFile, err)
 			os.Exit(1)
 		}
-	} else {
-		fmt.Fprint(os.Stderr, "Error: Too many arguments\n\n")
-		flag.Usage()
-		os.Exit(1)
 	}
 
 	// Create tokeniser and process input
@@ -87,6 +96,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Prepare output destination
+	var output io.Writer
+	var outputCloser io.Closer
+
+	if outputFile == "" {
+		// Write to stdout
+		output = os.Stdout
+	} else {
+		// Write to file
+		file, err := os.Create(outputFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating output file '%s': %v\n", outputFile, err)
+			os.Exit(1)
+		}
+		output = file
+		outputCloser = file
+	}
+
 	// Output tokens as JSON, one per line
 	for _, token := range tokens {
 		jsonBytes, err := json.Marshal(token)
@@ -94,7 +121,15 @@ func main() {
 			fmt.Fprintf(os.Stderr, "JSON encoding error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println(string(jsonBytes))
+		fmt.Fprintln(output, string(jsonBytes))
+	}
+
+	// Close output file if we opened one
+	if outputCloser != nil {
+		if err := outputCloser.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error closing output file '%s': %v\n", outputFile, err)
+			os.Exit(1)
+		}
 	}
 }
 

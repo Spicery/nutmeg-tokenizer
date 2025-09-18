@@ -11,17 +11,17 @@ const (
 	StringLiteral  TokenType = "s" // String literals with quotes and escapes
 
 	// Identifier tokens
-	StartToken     TokenType = "S" // Form start tokens (def, if, while)
-	EndToken       TokenType = "E" // Form end tokens (end, endif, endwhile)
-	CompoundToken  TokenType = "C" // Multi-part constructs
-	LabelToken     TokenType = "L" // Label identifiers
-	PrefixToken    TokenType = "P" // Prefix operators (return, yield)
-	VariableToken  TokenType = "V" // Variable identifiers
+	StartToken    TokenType = "S" // Form start tokens (def, if, while)
+	EndToken      TokenType = "E" // Form end tokens (end, endif, endwhile)
+	CompoundToken TokenType = "C" // Multi-part constructs
+	LabelToken    TokenType = "L" // Label identifiers
+	PrefixToken   TokenType = "P" // Prefix operators (return, yield)
+	VariableToken TokenType = "V" // Variable identifiers
 
 	// Other tokens
-	OperatorToken    TokenType = "O" // Infix/postfix operators
-	OpenDelimiter    TokenType = "[" // Opening brackets/braces/parentheses
-	CloseDelimiter   TokenType = "]" // Closing brackets/braces/parentheses
+	OperatorToken     TokenType = "O" // Infix/postfix operators
+	OpenDelimiter     TokenType = "[" // Opening brackets/braces/parentheses
+	CloseDelimiter    TokenType = "]" // Closing brackets/braces/parentheses
 	UnclassifiedToken TokenType = "U" // Unclassified tokens
 )
 
@@ -65,23 +65,21 @@ type Token struct {
 	Value *string `json:"value,omitempty"`
 
 	// Numeric token fields
-	Radix     *int    `json:"radix,omitempty"`
-	Mantissa  *string `json:"mantissa,omitempty"`
-	Fraction  *string `json:"fraction,omitempty"`
-	Exponent  *string `json:"exponent,omitempty"`
+	Radix    *int    `json:"radix,omitempty"`
+	Mantissa *string `json:"mantissa,omitempty"`
+	Fraction *string `json:"fraction,omitempty"`
+	Exponent *string `json:"exponent,omitempty"`
 
 	// Start token fields
-	ClosedBy []string `json:"closed_by,omitempty"`
+	Expecting []string `json:"expecting,omitempty"` // For start tokens
 
 	// Operator token fields
-	Prefix  *int `json:"prefix,omitempty"`
-	Infix   *int `json:"infix,omitempty"`
-	Postfix *int `json:"postfix,omitempty"`
+	Precedence *[3]int `json:"precedence,omitempty"` // [prefix, infix, postfix] precedence values
 
 	// Delimiter fields (for '[' tokens)
-	DelimiterClosedBy *string `json:"closed_by,omitempty"` // For delimiter tokens
-	InfixDelimiter    *bool   `json:"infix,omitempty"`     // For delimiter infix usage
-	PrefixDelimiter   *bool   `json:"prefix,omitempty"`    // For delimiter prefix usage
+	ClosedBy *string `json:"closed_by,omitempty"` // For delimiter tokens
+	Infix    *bool   `json:"infix,omitempty"`     // For delimiter infix usage
+	Prefix   *bool   `json:"prefix,omitempty"`    // For delimiter prefix usage
 }
 
 // NewToken creates a new token with the basic required fields.
@@ -123,13 +121,13 @@ func NewNumericToken(text string, radix int, mantissa, fraction, exponent string
 	return token
 }
 
-// NewStartToken creates a new start token with closing tokens.
-func NewStartToken(text string, closedBy []string, span Span) *Token {
+// NewStartToken creates a new start token with expected closing tokens.
+func NewStartToken(text string, expecting []string, span Span) *Token {
 	return &Token{
-		Text:     text,
-		Type:     StartToken,
-		Span:     span,
-		ClosedBy: closedBy,
+		Text:      text,
+		Type:      StartToken,
+		Span:      span,
+		Expecting: expecting,
 	}
 }
 
@@ -141,14 +139,10 @@ func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token
 		Span: span,
 	}
 
-	if prefix > 0 {
-		token.Prefix = &prefix
-	}
-	if infix > 0 {
-		token.Infix = &infix
-	}
-	if postfix > 0 {
-		token.Postfix = &postfix
+	// Only set precedence if at least one value is non-zero
+	if prefix > 0 || infix > 0 || postfix > 0 {
+		precedence := [3]int{prefix, infix, postfix}
+		token.Precedence = &precedence
 	}
 
 	return token
@@ -157,11 +151,11 @@ func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token
 // NewDelimiterToken creates a new open delimiter token.
 func NewDelimiterToken(text, closedBy string, isInfix, isPrefix bool, span Span) *Token {
 	return &Token{
-		Text:              text,
-		Type:              OpenDelimiter,
-		Span:              span,
-		DelimiterClosedBy: &closedBy,
-		InfixDelimiter:    &isInfix,
-		PrefixDelimiter:   &isPrefix,
+		Text:     text,
+		Type:     OpenDelimiter,
+		Span:     span,
+		ClosedBy: &closedBy,
+		Infix:    &isInfix,
+		Prefix:   &isPrefix,
 	}
 }

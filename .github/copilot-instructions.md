@@ -44,12 +44,10 @@ Each token will be represented as a JSON object on a single line, with the follo
     - `exponent`: The exponent part of numeric literals as a string (if any) as a decimal integer
 
 - Start tokens will also have:
-    - `closed_by`: An array of token texts that can close this start token (e.g., `def` is closed by `end`)
+    - `expecting`: An array of token texts that can close this start token (e.g., `def` is closed by `end`)
 
 - Operator tokens will also have:
-    - prefix: a natural number indicating the prefix-precedence of the operator (0 if not a prefix operator)
-    - infix: a natural number indicating the infix-precedence of the operator (0 if not an infix operator)
-    - postfix: a natural number indicating the postfix-precedence of the operator (0 if not
+    - precedence: 3 natural numbers indicating the prefix, infix and postfix precedences of the operator (0 if not a prefix operator)
 
 - `[` delimiter (bracket/brace/parenthesis) tokens will also have:
     - `closed_by`: The corresponding closing delimiter token text (e.g., `(` is closed by `)`)

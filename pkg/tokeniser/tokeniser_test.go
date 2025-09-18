@@ -89,8 +89,8 @@ func TestStringTokens(t *testing.T) {
 
 func TestNumericTokens(t *testing.T) {
 	tests := []struct {
-		input           string
-		expectedRadix   int
+		input            string
+		expectedRadix    int
 		expectedMantissa string
 		expectedFraction string
 		expectedExponent string
@@ -159,11 +159,14 @@ func TestStartTokens(t *testing.T) {
 	tests := []struct {
 		input        string
 		expectedType TokenType
-		closedBy     []string
+		expecting    []string
 	}{
-		{"def", StartToken, []string{"end"}},
+		{"def", StartToken, []string{"enddef", "end"}},
 		{"if", StartToken, []string{"endif", "end"}},
-		{"while", StartToken, []string{"endwhile", "end"}},
+		{"class", StartToken, []string{"endclass", "end"}},
+		{"fn", StartToken, []string{"endfn", "end"}},
+		{"try", StartToken, []string{"endtry", "end"}},
+		{"transaction", StartToken, []string{"endtransaction", "end"}},
 	}
 
 	for _, tt := range tests {
@@ -186,14 +189,14 @@ func TestStartTokens(t *testing.T) {
 				t.Errorf("Expected token type %s, got %s", tt.expectedType, token.Type)
 			}
 
-			if len(token.ClosedBy) != len(tt.closedBy) {
-				t.Errorf("Expected %d closing tokens, got %d", len(tt.closedBy), len(token.ClosedBy))
+			if len(token.Expecting) != len(tt.expecting) {
+				t.Errorf("Expected %d expecting tokens, got %d", len(tt.expecting), len(token.Expecting))
 				return
 			}
 
-			for i, expected := range tt.closedBy {
-				if token.ClosedBy[i] != expected {
-					t.Errorf("Expected closing token '%s' at index %d, got '%s'", expected, i, token.ClosedBy[i])
+			for i, expected := range tt.expecting {
+				if token.Expecting[i] != expected {
+					t.Errorf("Expected expecting token '%s' at index %d, got '%s'", expected, i, token.Expecting[i])
 				}
 			}
 		})
@@ -202,15 +205,13 @@ func TestStartTokens(t *testing.T) {
 
 func TestOperatorTokens(t *testing.T) {
 	tests := []struct {
-		input           string
-		expectedPrefix  int
-		expectedInfix   int
-		expectedPostfix int
+		input              string
+		expectedPrecedence [3]int // [prefix, infix, postfix]
 	}{
-		{"+", 0, 5, 0},
-		{"-", 8, 5, 0},
-		{"*", 0, 6, 0},
-		{"==", 0, 2, 0},
+		{"+", [3]int{0, 5, 0}},
+		{"-", [3]int{8, 5, 0}},
+		{"*", [3]int{0, 6, 0}},
+		{"==", [3]int{0, 2, 0}},
 	}
 
 	for _, tt := range tests {
@@ -233,34 +234,13 @@ func TestOperatorTokens(t *testing.T) {
 				t.Errorf("Expected operator token, got %s", token.Type)
 			}
 
-			if tt.expectedPrefix == 0 {
-				if token.Prefix != nil {
-					t.Errorf("Expected no prefix precedence, got %d", *token.Prefix)
-				}
-			} else {
-				if token.Prefix == nil || *token.Prefix != tt.expectedPrefix {
-					t.Errorf("Expected prefix precedence %d, got %v", tt.expectedPrefix, token.Prefix)
-				}
+			if token.Precedence == nil {
+				t.Errorf("Expected precedence to be set")
+				return
 			}
 
-			if tt.expectedInfix == 0 {
-				if token.Infix != nil {
-					t.Errorf("Expected no infix precedence, got %d", *token.Infix)
-				}
-			} else {
-				if token.Infix == nil || *token.Infix != tt.expectedInfix {
-					t.Errorf("Expected infix precedence %d, got %v", tt.expectedInfix, token.Infix)
-				}
-			}
-
-			if tt.expectedPostfix == 0 {
-				if token.Postfix != nil {
-					t.Errorf("Expected no postfix precedence, got %d", *token.Postfix)
-				}
-			} else {
-				if token.Postfix == nil || *token.Postfix != tt.expectedPostfix {
-					t.Errorf("Expected postfix precedence %d, got %v", tt.expectedPostfix, token.Postfix)
-				}
+			if *token.Precedence != tt.expectedPrecedence {
+				t.Errorf("Expected precedence %v, got %v", tt.expectedPrecedence, *token.Precedence)
 			}
 		})
 	}
@@ -303,17 +283,68 @@ func TestDelimiterTokens(t *testing.T) {
 			}
 
 			if tt.expectedType == OpenDelimiter {
-				if token.DelimiterClosedBy == nil || *token.DelimiterClosedBy != tt.closedBy {
-					t.Errorf("Expected closed by '%s', got %v", tt.closedBy, token.DelimiterClosedBy)
+				if token.ClosedBy == nil || *token.ClosedBy != tt.closedBy {
+					t.Errorf("Expected closed by '%s', got %v", tt.closedBy, token.ClosedBy)
 				}
 
-				if token.InfixDelimiter == nil || *token.InfixDelimiter != tt.isInfix {
-					t.Errorf("Expected infix %t, got %v", tt.isInfix, token.InfixDelimiter)
+				if token.Infix == nil || *token.Infix != tt.isInfix {
+					t.Errorf("Expected infix %t, got %v", tt.isInfix, token.Infix)
 				}
 
-				if token.PrefixDelimiter == nil || *token.PrefixDelimiter != tt.isPrefix {
-					t.Errorf("Expected prefix %t, got %v", tt.isPrefix, token.PrefixDelimiter)
+				if token.Prefix == nil || *token.Prefix != tt.isPrefix {
+					t.Errorf("Expected prefix %t, got %v", tt.isPrefix, token.Prefix)
 				}
+			}
+		})
+	}
+}
+
+func TestKeywordClassification(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedType TokenType
+	}{
+		// Label tokens (L)
+		{"then", LabelToken},
+		{"else", LabelToken},
+
+		// Compound tokens (C)
+		{"catch", CompoundToken},
+		{"elseif", CompoundToken},
+		{"elseifnot", CompoundToken},
+
+		// Prefix tokens (P)
+		{"return", PrefixToken},
+		{"yield", PrefixToken},
+
+		// End tokens (E)
+		{"end", EndToken},
+		{"enddef", EndToken},
+		{"endclass", EndToken},
+
+		// Variable tokens (V) - should default to this for unknown identifiers
+		{"myVariable", VariableToken},
+		{"unknown", VariableToken},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			tokeniser := New(tt.input)
+			tokens, err := tokeniser.Tokenise()
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(tokens) != 1 {
+				t.Errorf("Expected 1 token, got %d", len(tokens))
+				return
+			}
+
+			token := tokens[0]
+			if token.Type != tt.expectedType {
+				t.Errorf("Expected token type %s, got %s", tt.expectedType, token.Type)
 			}
 		})
 	}
