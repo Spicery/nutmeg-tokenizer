@@ -14,7 +14,8 @@ type Tokeniser struct {
 	line           int
 	column         int
 	tokens         []*Token
-	expectingStack [][]string // Stack of expecting arrays for context tracking
+	expectingStack [][]string      // Stack of expecting arrays for context tracking
+	rules          *TokeniserRules // Custom rules for this tokeniser instance
 }
 
 // Regular expressions for token matching
@@ -192,7 +193,7 @@ var delimiterProperties = map[string][2]bool{
 	"{": {true, true},  // infix=false, prefix=true
 }
 
-// New creates a new tokeniser instance.
+// New creates a new tokeniser instance with default rules.
 func New(input string) *Tokeniser {
 	return &Tokeniser{
 		input:          input,
@@ -200,7 +201,44 @@ func New(input string) *Tokeniser {
 		column:         1,
 		tokens:         make([]*Token, 0),
 		expectingStack: make([][]string, 0),
+		rules:          nil, // Use global variables for backward compatibility
 	}
+}
+
+// NewWithRules creates a new tokeniser instance with custom rules.
+func NewWithRules(input string, rules *TokeniserRules) *Tokeniser {
+	return &Tokeniser{
+		input:          input,
+		line:           1,
+		column:         1,
+		tokens:         make([]*Token, 0),
+		expectingStack: make([][]string, 0),
+		rules:          rules,
+	}
+}
+
+// Helper methods to access rules with fallback to global variables
+
+func (t *Tokeniser) getStartTokens() map[string]StartTokenData {
+	if t.rules != nil {
+		return t.rules.StartTokens
+	}
+	return startTokens
+}
+
+func (t *Tokeniser) getLabelTokens() map[string]LabelTokenData {
+	if t.rules != nil {
+		return t.rules.LabelTokens
+	}
+	return labelTokens
+}
+
+func (t *Tokeniser) getWildcardTokens() map[string]bool {
+	if t.rules != nil {
+		return t.rules.WildcardTokens
+	}
+	// Default wildcard is just ":"
+	return map[string]bool{":": true}
 }
 
 // pushExpecting pushes a new set of expected tokens onto the stack.
@@ -518,11 +556,18 @@ func (t *Tokeniser) matchSpecialLabels() *Token {
 		return NewLabelToken("=>>", labelData.Expecting, labelData.In, span)
 	}
 
-	// Check for wildcard ':'
-	if t.position < len(t.input) && t.input[t.position] == ':' {
-		// Make sure it's a single ':' and not part of a longer operator
-		if t.position+1 >= len(t.input) || !strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
-			end := Position{Line: t.line, Col: t.column + 1}
+	// Check for wildcard tokens
+	wildcardTokens := t.getWildcardTokens()
+	for wildcardText := range wildcardTokens {
+		if t.position < len(t.input) && strings.HasPrefix(t.input[t.position:], wildcardText) {
+			// For single character wildcards, make sure it's not part of a longer operator
+			if len(wildcardText) == 1 && wildcardText == ":" {
+				if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
+					continue // Skip this wildcard as it's part of a longer operator
+				}
+			}
+
+			end := Position{Line: t.line, Col: t.column + len(wildcardText)}
 			span := Span{End: end}
 
 			// Check if we have context from the expecting stack
@@ -532,30 +577,32 @@ func (t *Tokeniser) matchSpecialLabels() *Token {
 				expectedText := expected[0]
 
 				// Check if it's a label token
+				labelTokens := t.getLabelTokens()
 				if labelData, exists := labelTokens[expectedText]; exists {
 					// Create a wildcard token that copies attributes from the expected label
-					t.advance(1)
-					return NewWildcardLabelTokenWithAttributes(":", expectedText, labelData.Expecting, labelData.In, span)
+					t.advance(len(wildcardText))
+					return NewWildcardLabelTokenWithAttributes(wildcardText, expectedText, labelData.Expecting, labelData.In, span)
 				}
 
 				// Check if it's a start token
+				startTokens := t.getStartTokens()
 				if startData, exists := startTokens[expectedText]; exists {
 					// Create wildcard start token
-					t.advance(1)
-					return NewWildcardStartToken(":", expectedText, startData.ClosedBy, span)
+					t.advance(len(wildcardText))
+					return NewWildcardStartToken(wildcardText, expectedText, startData.ClosedBy, span)
 				}
 
 				// Check if it's an end token (starts with "end")
 				if strings.HasPrefix(expectedText, "end") {
 					// Create wildcard end token
-					t.advance(1)
-					return NewWildcardEndToken(":", expectedText, span)
+					t.advance(len(wildcardText))
+					return NewWildcardEndToken(wildcardText, expectedText, span)
 				}
 			}
 
 			// No context available, create unclassified token
-			t.advance(1)
-			return NewToken(":", UnclassifiedToken, span)
+			t.advance(len(wildcardText))
+			return NewToken(wildcardText, UnclassifiedToken, span)
 		}
 	}
 

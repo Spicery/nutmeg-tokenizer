@@ -22,21 +22,24 @@ Options:
   -v, --version         Show version information
   --input <file>        Input file (defaults to stdin)
   --output <file>       Output file (defaults to stdout)
+  --rules <file>        YAML rules file for custom tokenisation rules (optional)
 
 Examples:
   nutmeg-tokeniser                                    # Read from stdin, write to stdout
   nutmeg-tokeniser --input source.nutmeg             # Read from file, write to stdout
   nutmeg-tokeniser --output tokens.json              # Read from stdin, write to file
   nutmeg-tokeniser --input source.nutmeg --output tokens.json  # Read from file, write to file
+  nutmeg-tokeniser --rules custom.yaml --input source.nutmeg   # Use custom rules
   echo "def foo end" | nutmeg-tokeniser              # Read from stdin, write to stdout
 
 The tokeniser outputs one JSON token object per line.
+See docs/rules_file.md for information about custom rules files.
 `
 )
 
 func main() {
 	var showHelp, showVersion bool
-	var inputFile, outputFile string
+	var inputFile, outputFile, rulesFile string
 
 	flag.BoolVar(&showHelp, "h", false, "Show help")
 	flag.BoolVar(&showHelp, "help", false, "Show help")
@@ -44,6 +47,7 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "Show version")
 	flag.StringVar(&inputFile, "input", "", "Input file (defaults to stdin)")
 	flag.StringVar(&outputFile, "output", "", "Output file (defaults to stdout)")
+	flag.StringVar(&rulesFile, "rules", "", "YAML rules file (optional)")
 
 	flag.Usage = func() {
 		fmt.Fprint(os.Stderr, usage)
@@ -88,8 +92,22 @@ func main() {
 		}
 	}
 
-	// Create tokeniser and process input
-	t := tokeniser.New(input)
+	// Load rules if specified
+	var t *tokeniser.Tokeniser
+	if rulesFile != "" {
+		rules, err := tokeniser.LoadRulesFile(rulesFile)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading rules file '%s': %v\n", rulesFile, err)
+			os.Exit(1)
+		}
+
+		tokeniserRules := tokeniser.ApplyRulesToDefaults(rules)
+		t = tokeniser.NewWithRules(input, tokeniserRules)
+	} else {
+		t = tokeniser.New(input)
+	}
+
+	// Process input
 	tokens, err := t.Tokenise()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Tokenisation error: %v\n", err)
