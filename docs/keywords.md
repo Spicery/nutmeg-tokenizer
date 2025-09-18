@@ -18,14 +18,14 @@ The end tokens are always `end` or `end{START}`
 
 ## Simple Labels (L)
 
-- then, which may occur after `if` or `elseif` or `ifnot` or `elseifnot` or `catch`
-- else, which may occur after `then` or `try` or `catch`
+- then, expecting=[`else`, `elseif`, `elseifnot`, `catch`], in=[`try`, `if`]
+- else, expecting=[], in=[`if`, `try`]
 
 ## Compound Labels (C)
 
-- catch, which may only appear after `try` or `then`
-- elseif, which may only occur after `then`
-- elseifnot, which may only occur after `then`
+- catch, expecting=[`then`, `:`], in=[`try`]
+- elseif, expecting=[`then`, `:`], in=[`if`]
+- elseifnot, expecting=[`then`, `:`], in=[`if`]
 
 ## Prefix Forms (P)
 

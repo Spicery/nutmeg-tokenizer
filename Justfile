@@ -1,19 +1,19 @@
 default:
     @just --list
 
-just test: unittest lint fmt tidy build
+test: unittest lint fmt tidy build
 
-just unittest:
+unittest:
     go test -v ./...
 
-just lint:
+lint:
     golangci-lint run
 
-just fmt:
+fmt:
     gofmt -w .
 
-just tidy:
+tidy:
     go mod tidy
 
-just build:
+build:
     go build -o bin/nutmeg-tokeniser ./cmd/nutmeg-tokeniser

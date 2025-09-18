@@ -70,8 +70,9 @@ type Token struct {
 	Fraction *string `json:"fraction,omitempty"`
 	Exponent *string `json:"exponent,omitempty"`
 
-	// Start token fields
-	Expecting []string `json:"expecting,omitempty"` // For start tokens
+	// Start token, Label token, and Compound token fields
+	Expecting []string `json:"expecting,omitempty"` // For start tokens (what can close them) and label/compound tokens (what can follow them)
+	In        []string `json:"in,omitempty"`        // For label and compound tokens - what can contain them
 
 	// Operator token fields
 	Precedence *[3]int `json:"precedence,omitempty"` // [prefix, infix, postfix] precedence values
@@ -157,5 +158,27 @@ func NewDelimiterToken(text, closedBy string, isInfix, isPrefix bool, span Span)
 		ClosedBy: &closedBy,
 		Infix:    &isInfix,
 		Prefix:   &isPrefix,
+	}
+}
+
+// NewLabelToken creates a new label token with expecting and in attributes.
+func NewLabelToken(text string, expecting, in []string, span Span) *Token {
+	return &Token{
+		Text:      text,
+		Type:      LabelToken,
+		Span:      span,
+		Expecting: expecting,
+		In:        in,
+	}
+}
+
+// NewCompoundToken creates a new compound token with expecting and in attributes.
+func NewCompoundToken(text string, expecting, in []string, span Span) *Token {
+	return &Token{
+		Text:      text,
+		Type:      CompoundToken,
+		Span:      span,
+		Expecting: expecting,
+		In:        in,
 	}
 }

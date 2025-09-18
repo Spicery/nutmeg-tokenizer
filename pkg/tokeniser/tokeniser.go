@@ -38,17 +38,42 @@ var startTokens = map[string][]string{
 	"transaction": {"end"},
 }
 
-// Label tokens (L)
-var labelTokens = map[string]bool{
-	"then": true,
-	"else": true,
+// Label tokens (L) with their attributes
+type LabelTokenData struct {
+	Expecting []string
+	In        []string
 }
 
-// Compound tokens (C)
-var compoundTokens = map[string]bool{
-	"catch":     true,
-	"elseif":    true,
-	"elseifnot": true,
+var labelTokens = map[string]LabelTokenData{
+	"then": {
+		Expecting: []string{"else", "elseif", "elseifnot", "catch"},
+		In:        []string{"try", "if"},
+	},
+	"else": {
+		Expecting: []string{},
+		In:        []string{"if", "try"},
+	},
+}
+
+// Compound tokens (C) with their attributes
+type CompoundTokenData struct {
+	Expecting []string
+	In        []string
+}
+
+var compoundTokens = map[string]CompoundTokenData{
+	"catch": {
+		Expecting: []string{"then", ":"},
+		In:        []string{"try"},
+	},
+	"elseif": {
+		Expecting: []string{"then", ":"},
+		In:        []string{"if"},
+	},
+	"elseifnot": {
+		Expecting: []string{"then", ":"},
+		In:        []string{"if"},
+	},
 }
 
 // Prefix tokens (P)
@@ -321,12 +346,14 @@ func (t *Tokeniser) matchIdentifier() *Token {
 	// Check if it's an end token
 	if strings.HasPrefix(match, "end") {
 		tokenType = EndToken
-	} else if labelTokens[match] {
+	} else if labelData, isLabel := labelTokens[match]; isLabel {
 		// Check if it's a label token (L)
-		tokenType = LabelToken
-	} else if compoundTokens[match] {
+		t.advance(len(match))
+		return NewLabelToken(match, labelData.Expecting, labelData.In, span)
+	} else if compoundData, isCompound := compoundTokens[match]; isCompound {
 		// Check if it's a compound token (C)
-		tokenType = CompoundToken
+		t.advance(len(match))
+		return NewCompoundToken(match, compoundData.Expecting, compoundData.In, span)
 	} else if prefixTokens[match] {
 		// Check if it's a prefix token (P)
 		tokenType = PrefixToken

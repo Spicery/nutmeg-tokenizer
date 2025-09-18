@@ -256,7 +256,7 @@ func TestDelimiterTokens(t *testing.T) {
 	}{
 		{"(", OpenDelimiter, ")", true, true},
 		{"[", OpenDelimiter, "]", true, false},
-		{"{", OpenDelimiter, "}", false, true},
+		{"{", OpenDelimiter, "}", true, true}, // Updated: now supports infix usage for f{x} syntax
 		{")", CloseDelimiter, "", false, false},
 		{"]", CloseDelimiter, "", false, false},
 		{"}", CloseDelimiter, "", false, false},
