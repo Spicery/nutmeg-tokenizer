@@ -1,0 +1,8 @@
+### Simple Nutmeg example
+def greet(name)
+    "Hello, " + name + "!"
+end
+
+def main()
+    greet("World")
+end

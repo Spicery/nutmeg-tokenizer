@@ -1,0 +1,7 @@
+### Numeric examples
+binary = 0b1010
+octal = 0o755
+hex = 0xFF
+decimal = 42
+float = 3.14
+scientific = 1.5e-10
