@@ -32,3 +32,4 @@ tmp/
 build/
 dist/
 /nutmeg-tokeniser
+/bin/
