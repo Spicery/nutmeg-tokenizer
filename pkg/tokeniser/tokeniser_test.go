@@ -439,7 +439,9 @@ func TestCustomRulesWildcard(t *testing.T) {
 	}
 
 	// Build the precomputed lookup map
-	rules.BuildTokenLookup()
+	if err := rules.BuildTokenLookup(); err != nil {
+		t.Fatalf("Failed to build token lookup: %v", err)
+	}
 
 	// Test with custom wildcard in a def context
 	tokeniser := NewWithRules("def foo *", rules)

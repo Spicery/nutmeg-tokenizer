@@ -113,7 +113,10 @@ func DefaultRules() *TokeniserRules {
 	}
 
 	// Build the precomputed lookup map
-	rules.BuildTokenLookup()
+	// Note: Default rules should never have conflicts, so we panic if there's an error
+	if err := rules.BuildTokenLookup(); err != nil {
+		panic(fmt.Sprintf("Invalid default rules: %v", err))
+	}
 
 	return rules
 }
@@ -133,8 +136,9 @@ func LoadRulesFile(filename string) (*RulesFile, error) {
 	return &rules, nil
 }
 
-// ApplyRulesToDefaults applies the rules from a RulesFile to create a new TokeniserRules
-func ApplyRulesToDefaults(rules *RulesFile) *TokeniserRules {
+// ApplyRulesToDefaults applies the rules from a RulesFile to create a new TokeniserRules.
+// Returns an error if there are conflicting token definitions.
+func ApplyRulesToDefaults(rules *RulesFile) (*TokeniserRules, error) {
 	tokeniserRules := DefaultRules()
 
 	// Apply bracket rules
@@ -205,9 +209,11 @@ func ApplyRulesToDefaults(rules *RulesFile) *TokeniserRules {
 	}
 
 	// Build the precomputed lookup map for efficient matching
-	tokeniserRules.BuildTokenLookup()
+	if err := tokeniserRules.BuildTokenLookup(); err != nil {
+		return nil, err
+	}
 
-	return tokeniserRules
+	return tokeniserRules, nil
 }
 
 // Helper functions to get default values (these will copy from the existing global variables)
@@ -315,56 +321,65 @@ func getDefaultWildcardTokens() map[string]bool {
 	}
 }
 
-// BuildTokenLookup creates the precomputed lookup map for efficient token matching
-func (rules *TokeniserRules) BuildTokenLookup() {
+// BuildTokenLookup creates the precomputed lookup map for efficient token matching.
+// Returns an error if a token is defined in multiple rules.
+func (rules *TokeniserRules) BuildTokenLookup() error {
 	rules.TokenLookup = make(map[string][]CustomRuleEntry)
+	tokenSources := make(map[string]string) // Track which rule type defined each token
+
+	// Helper function to add a token and check for duplicates
+	addToken := func(token string, ruleType CustomRuleType, ruleTypeName string, data interface{}) error {
+		if existingSource, exists := tokenSources[token]; exists {
+			return fmt.Errorf("token '%s' is defined in both %s and %s rules", token, existingSource, ruleTypeName)
+		}
+		tokenSources[token] = ruleTypeName
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: ruleType,
+			Data: data,
+		})
+		return nil
+	}
 
 	// Add wildcard tokens
 	for token := range rules.WildcardTokens {
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
-			Type: CustomWildcard,
-			Data: nil,
-		})
+		if err := addToken(token, CustomWildcard, "wildcard", nil); err != nil {
+			return err
+		}
 	}
 
 	// Add start tokens
 	for token, data := range rules.StartTokens {
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
-			Type: CustomStart,
-			Data: data,
-		})
+		if err := addToken(token, CustomStart, "start", data); err != nil {
+			return err
+		}
 	}
 
 	// Add label tokens
 	for token, data := range rules.LabelTokens {
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
-			Type: CustomLabel,
-			Data: data,
-		})
+		if err := addToken(token, CustomLabel, "label", data); err != nil {
+			return err
+		}
 	}
 
 	// Add compound tokens
 	for token, data := range rules.CompoundTokens {
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
-			Type: CustomCompound,
-			Data: data,
-		})
+		if err := addToken(token, CustomCompound, "compound", data); err != nil {
+			return err
+		}
 	}
 
 	// Add prefix tokens
 	for token := range rules.PrefixTokens {
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
-			Type: CustomPrefix,
-			Data: nil,
-		})
+		if err := addToken(token, CustomPrefix, "prefix", nil); err != nil {
+			return err
+		}
 	}
 
 	// Add operator tokens
 	for token, precedence := range rules.OperatorPrecedences {
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
-			Type: CustomOperator,
-			Data: precedence,
-		})
+		if err := addToken(token, CustomOperator, "operator", precedence); err != nil {
+			return err
+		}
 	}
 
 	// Add open delimiter tokens
@@ -379,29 +394,42 @@ func (rules *TokeniserRules) BuildTokenLookup() {
 			IsInfix:  props[0],
 			IsPrefix: props[1],
 		}
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
-			Type: CustomOpenDelimiter,
-			Data: delimiterData,
-		})
+		if err := addToken(token, CustomOpenDelimiter, "bracket", delimiterData); err != nil {
+			return err
+		}
 	}
 
 	// Add close delimiter tokens (derived from closed_by fields)
+	// Note: These can legitimately appear multiple times from different brackets
+	closeDelimiters := make(map[string]bool)
 	for _, closedByList := range rules.DelimiterMappings {
 		for _, closer := range closedByList {
-			rules.TokenLookup[closer] = append(rules.TokenLookup[closer], CustomRuleEntry{
-				Type: CustomCloseDelimiter,
-				Data: nil,
-			})
+			if !closeDelimiters[closer] {
+				closeDelimiters[closer] = true
+				// Don't check for duplicates for close delimiters since they're derived
+				rules.TokenLookup[closer] = append(rules.TokenLookup[closer], CustomRuleEntry{
+					Type: CustomCloseDelimiter,
+					Data: nil,
+				})
+			}
 		}
 	}
 
 	// Add end tokens (derived from start token closed_by fields)
+	// Note: These can legitimately appear multiple times from different start tokens
+	endTokens := make(map[string]bool)
 	for _, startData := range rules.StartTokens {
 		for _, endToken := range startData.ClosedBy {
-			rules.TokenLookup[endToken] = append(rules.TokenLookup[endToken], CustomRuleEntry{
-				Type: CustomEnd,
-				Data: nil,
-			})
+			if !endTokens[endToken] {
+				endTokens[endToken] = true
+				// Don't check for duplicates for end tokens since they're derived
+				rules.TokenLookup[endToken] = append(rules.TokenLookup[endToken], CustomRuleEntry{
+					Type: CustomEnd,
+					Data: nil,
+				})
+			}
 		}
 	}
+
+	return nil
 }

@@ -101,7 +101,11 @@ func main() {
 			os.Exit(1)
 		}
 
-		tokeniserRules := tokeniser.ApplyRulesToDefaults(rules)
+		tokeniserRules, err := tokeniser.ApplyRulesToDefaults(rules)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error applying rules: %v\n", err)
+			os.Exit(1)
+		}
 		t = tokeniser.NewWithRules(input, tokeniserRules)
 	} else {
 		t = tokeniser.New(input)
