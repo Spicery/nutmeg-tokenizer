@@ -96,7 +96,7 @@ type TokeniserRules struct {
 	OperatorPrecedences map[string][3]int // [prefix, infix, postfix]
 
 	// Precomputed lookup map for efficient matching
-	TokenLookup map[string][]CustomRuleEntry
+	TokenLookup map[string]CustomRuleEntry
 }
 
 // DefaultRules returns the default tokeniser rules
@@ -324,7 +324,7 @@ func getDefaultWildcardTokens() map[string]bool {
 // BuildTokenLookup creates the precomputed lookup map for efficient token matching.
 // Returns an error if a token is defined in multiple rules.
 func (rules *TokeniserRules) BuildTokenLookup() error {
-	rules.TokenLookup = make(map[string][]CustomRuleEntry)
+	rules.TokenLookup = make(map[string]CustomRuleEntry)
 	tokenSources := make(map[string]string) // Track which rule type defined each token
 
 	// Helper function to add a token and check for duplicates
@@ -333,10 +333,10 @@ func (rules *TokeniserRules) BuildTokenLookup() error {
 			return fmt.Errorf("token '%s' is defined in both %s and %s rules", token, existingSource, ruleTypeName)
 		}
 		tokenSources[token] = ruleTypeName
-		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+		rules.TokenLookup[token] = CustomRuleEntry{
 			Type: ruleType,
 			Data: data,
-		})
+		}
 		return nil
 	}
 
@@ -407,10 +407,10 @@ func (rules *TokeniserRules) BuildTokenLookup() error {
 			if !closeDelimiters[closer] {
 				closeDelimiters[closer] = true
 				// Don't check for duplicates for close delimiters since they're derived
-				rules.TokenLookup[closer] = append(rules.TokenLookup[closer], CustomRuleEntry{
+				rules.TokenLookup[closer] = CustomRuleEntry{
 					Type: CustomCloseDelimiter,
 					Data: nil,
-				})
+				}
 			}
 		}
 	}
@@ -423,10 +423,10 @@ func (rules *TokeniserRules) BuildTokenLookup() error {
 			if !endTokens[endToken] {
 				endTokens[endToken] = true
 				// Don't check for duplicates for end tokens since they're derived
-				rules.TokenLookup[endToken] = append(rules.TokenLookup[endToken], CustomRuleEntry{
+				rules.TokenLookup[endToken] = CustomRuleEntry{
 					Type: CustomEnd,
 					Data: nil,
-				})
+				}
 			}
 		}
 	}

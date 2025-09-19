@@ -676,7 +676,7 @@ func (t *Tokeniser) matchCustomRules() *Token {
 	}
 
 	// Efficient lookup - single map access
-	entries, exists := t.rules.TokenLookup[text]
+	entry, exists := t.rules.TokenLookup[text]
 	if !exists {
 		return nil
 	}
@@ -684,90 +684,88 @@ func (t *Tokeniser) matchCustomRules() *Token {
 	end := Position{Line: t.line, Col: t.column + len(text)}
 	span := Span{End: end}
 
-	// Process rules in priority order
-	for _, entry := range entries {
-		switch entry.Type {
-		case CustomWildcard:
-			// For single character wildcards, make sure it's not part of a longer operator
-			if len(text) == 1 && text == ":" {
-				if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
-					continue // Skip this wildcard as it's part of a longer operator
-				}
+	// Process the single rule entry
+	switch entry.Type {
+	case CustomWildcard:
+		// For single character wildcards, make sure it's not part of a longer operator
+		if len(text) == 1 && text == ":" {
+			if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
+				return nil // Skip this wildcard as it's part of a longer operator
 			}
-
-			// Check if we have context from the expecting stack
-			expected := t.getCurrentlyExpected()
-			if len(expected) > 0 {
-				// Use the first expected token as the basis for the wildcard
-				expectedText := expected[0]
-
-				// Check if it's a label token
-				if labelData, exists := t.rules.LabelTokens[expectedText]; exists {
-					// Create a wildcard token that copies attributes from the expected label
-					t.advance(len(text))
-					return NewWildcardLabelTokenWithAttributes(text, expectedText, labelData.Expecting, labelData.In, span)
-				}
-
-				// Check if it's a start token
-				if startData, exists := t.rules.StartTokens[expectedText]; exists {
-					// Create wildcard start token
-					t.advance(len(text))
-					return NewWildcardStartToken(text, expectedText, startData.ClosedBy, span)
-				}
-
-				// Check if it's an end token (starts with "end")
-				if strings.HasPrefix(expectedText, "end") {
-					// Create wildcard end token
-					t.advance(len(text))
-					return NewWildcardEndToken(text, expectedText, span)
-				}
-			}
-
-			// No context available, create unclassified token
-			t.advance(len(text))
-			return NewToken(text, UnclassifiedToken, span)
-
-		case CustomStart:
-			startData := entry.Data.(StartTokenData)
-			t.advance(len(text))
-			return NewStartToken(text, startData.Expecting, startData.ClosedBy, span)
-
-		case CustomEnd:
-			t.advance(len(text))
-			return NewToken(text, EndToken, span)
-
-		case CustomLabel:
-			labelData := entry.Data.(LabelTokenData)
-			t.advance(len(text))
-			return NewLabelToken(text, labelData.Expecting, labelData.In, span)
-
-		case CustomCompound:
-			compoundData := entry.Data.(CompoundTokenData)
-			t.advance(len(text))
-			return NewCompoundToken(text, compoundData.Expecting, compoundData.In, span)
-
-		case CustomPrefix:
-			t.advance(len(text))
-			return NewToken(text, PrefixToken, span)
-
-		case CustomOperator:
-			precedence := entry.Data.([3]int)
-			t.advance(len(text))
-			return NewOperatorToken(text, precedence[0], precedence[1], precedence[2], span)
-
-		case CustomOpenDelimiter:
-			delimiterData := entry.Data.(struct {
-				ClosedBy []string
-				IsInfix  bool
-				IsPrefix bool
-			})
-			t.advance(len(text))
-			return NewDelimiterToken(text, delimiterData.ClosedBy, delimiterData.IsInfix, delimiterData.IsPrefix, span)
-
-		case CustomCloseDelimiter:
-			t.advance(len(text))
-			return NewToken(text, CloseDelimiter, span)
 		}
+
+		// Check if we have context from the expecting stack
+		expected := t.getCurrentlyExpected()
+		if len(expected) > 0 {
+			// Use the first expected token as the basis for the wildcard
+			expectedText := expected[0]
+
+			// Check if it's a label token
+			if labelData, exists := t.rules.LabelTokens[expectedText]; exists {
+				// Create a wildcard token that copies attributes from the expected label
+				t.advance(len(text))
+				return NewWildcardLabelTokenWithAttributes(text, expectedText, labelData.Expecting, labelData.In, span)
+			}
+
+			// Check if it's a start token
+			if startData, exists := t.rules.StartTokens[expectedText]; exists {
+				// Create wildcard start token
+				t.advance(len(text))
+				return NewWildcardStartToken(text, expectedText, startData.ClosedBy, span)
+			}
+
+			// Check if it's an end token (starts with "end")
+			if strings.HasPrefix(expectedText, "end") {
+				// Create wildcard end token
+				t.advance(len(text))
+				return NewWildcardEndToken(text, expectedText, span)
+			}
+		}
+
+		// No context available, create unclassified token
+		t.advance(len(text))
+		return NewToken(text, UnclassifiedToken, span)
+
+	case CustomStart:
+		startData := entry.Data.(StartTokenData)
+		t.advance(len(text))
+		return NewStartToken(text, startData.Expecting, startData.ClosedBy, span)
+
+	case CustomEnd:
+		t.advance(len(text))
+		return NewToken(text, EndToken, span)
+
+	case CustomLabel:
+		labelData := entry.Data.(LabelTokenData)
+		t.advance(len(text))
+		return NewLabelToken(text, labelData.Expecting, labelData.In, span)
+
+	case CustomCompound:
+		compoundData := entry.Data.(CompoundTokenData)
+		t.advance(len(text))
+		return NewCompoundToken(text, compoundData.Expecting, compoundData.In, span)
+
+	case CustomPrefix:
+		t.advance(len(text))
+		return NewToken(text, PrefixToken, span)
+
+	case CustomOperator:
+		precedence := entry.Data.([3]int)
+		t.advance(len(text))
+		return NewOperatorToken(text, precedence[0], precedence[1], precedence[2], span)
+
+	case CustomOpenDelimiter:
+		delimiterData := entry.Data.(struct {
+			ClosedBy []string
+			IsInfix  bool
+			IsPrefix bool
+		})
+		t.advance(len(text))
+		return NewDelimiterToken(text, delimiterData.ClosedBy, delimiterData.IsInfix, delimiterData.IsPrefix, span)
+
+	case CustomCloseDelimiter:
+		t.advance(len(text))
+		return NewToken(text, CloseDelimiter, span)
 	}
 
 	return nil
