@@ -1,0 +1,7 @@
+
+bracket:
+  - text: "<"
+    closed_by: 
+      - ">"
+    infix: true
+    prefix: true

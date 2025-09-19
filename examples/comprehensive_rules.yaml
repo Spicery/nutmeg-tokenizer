@@ -1,0 +1,36 @@
+bracket:
+  - text: "<"
+    closed_by: [">"]
+    infix: true
+    prefix: true
+  - text: "<<"
+    closed_by: [">>"]
+    infix: false
+    prefix: true
+
+prefix:
+  - text: "emit"
+  - text: "spawn"
+
+start:
+  - text: "begin"
+    closed_by: ["finish"]
+  - text: "loop"
+    closed_by: ["endloop"]
+
+label:
+  - text: "where"
+  - text: "such_that"
+
+compound:
+  - text: "else_if"
+  - text: "or_else"
+
+wildcard:
+  - text: "*"
+
+operator:
+  - text: "**"
+    precedence: [0, 200, 0]
+  - text: "<>"
+    precedence: [0, 50, 0]

@@ -11,8 +11,27 @@ The rules are in the following categories:
 - wildcard
 - operator
 
-Token boundaries are baked into the algorithm but the classification is decided
-by matching against the below rules.
+## Key ideas
+
+- Token boundaries are baked into the algorithm but the classification is
+  decided by matching against the rules. The boundaries are:
+    - strings and numbers are specially recognised
+    - alphanumerics + underbars bind together
+    - sign characters bind together
+    - everything else is a single character
+
+- The end-tokens `E` category is implicitly defined by the `closed_by` field of the
+  start tokens.
+
+- The close-tokens `]` category is implicitly defined `closed_by` field of the
+  open-tokens `[`.
+
+- Categories can be included or omitted. Where a category is included it is
+  the only way that a token can be put in that category.
+
+- If a token is recognised by any of the rules, this takes precedence over
+  the default rules.
+
 
 ## Bracket rules
 
