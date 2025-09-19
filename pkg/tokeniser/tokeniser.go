@@ -248,13 +248,6 @@ func (t *Tokeniser) getDelimiterMappings() map[string][]string {
 	return delimiterMappings
 }
 
-func (t *Tokeniser) getDelimiterProperties() map[string][2]bool {
-	if t.rules != nil {
-		return t.rules.DelimiterProperties
-	}
-	return delimiterProperties
-}
-
 // pushExpecting pushes a new set of expected tokens onto the stack.
 func (t *Tokeniser) pushExpecting(expected []string) {
 	t.expectingStack = append(t.expectingStack, expected)
@@ -660,7 +653,7 @@ func (t *Tokeniser) matchSpecialLabels() *Token {
 // matchCustomRules checks for any custom rules that match at the current position.
 // Custom rules take precedence over default rules.
 func (t *Tokeniser) matchCustomRules() *Token {
-	if t.rules == nil {
+	if t.rules == nil || t.rules.TokenLookup == nil {
 		return nil // No custom rules
 	}
 
@@ -682,20 +675,25 @@ func (t *Tokeniser) matchCustomRules() *Token {
 		return nil
 	}
 
-	// Now check if this exact token text matches any custom rules
+	// Efficient lookup - single map access
+	entries, exists := t.rules.TokenLookup[text]
+	if !exists {
+		return nil
+	}
 
-	// Check custom wildcard rules first (they can override specific text)
-	if t.rules.WildcardTokens != nil {
-		if _, exists := t.rules.WildcardTokens[text]; exists {
+	end := Position{Line: t.line, Col: t.column + len(text)}
+	span := Span{End: end}
+
+	// Process rules in priority order
+	for _, entry := range entries {
+		switch entry.Type {
+		case CustomWildcard:
 			// For single character wildcards, make sure it's not part of a longer operator
 			if len(text) == 1 && text == ":" {
 				if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
-					return nil // Skip this wildcard as it's part of a longer operator
+					continue // Skip this wildcard as it's part of a longer operator
 				}
 			}
-
-			end := Position{Line: t.line, Col: t.column + len(text)}
-			span := Span{End: end}
 
 			// Check if we have context from the expecting stack
 			expected := t.getCurrentlyExpected()
@@ -728,80 +726,47 @@ func (t *Tokeniser) matchCustomRules() *Token {
 			// No context available, create unclassified token
 			t.advance(len(text))
 			return NewToken(text, UnclassifiedToken, span)
-		}
-	}
 
-	// Check custom start rules
-	if startData, exists := t.rules.StartTokens[text]; exists {
-		end := Position{Line: t.line, Col: t.column + len(text)}
-		span := Span{End: end}
-		t.advance(len(text))
-		return NewStartToken(text, startData.Expecting, startData.ClosedBy, span)
-	}
+		case CustomStart:
+			startData := entry.Data.(StartTokenData)
+			t.advance(len(text))
+			return NewStartToken(text, startData.Expecting, startData.ClosedBy, span)
 
-	// Check custom end tokens
-	if strings.HasPrefix(text, "end") {
-		end := Position{Line: t.line, Col: t.column + len(text)}
-		span := Span{End: end}
-		t.advance(len(text))
-		return NewToken(text, EndToken, span)
-	}
+		case CustomEnd:
+			t.advance(len(text))
+			return NewToken(text, EndToken, span)
 
-	// Check custom label rules
-	if labelData, exists := t.rules.LabelTokens[text]; exists {
-		end := Position{Line: t.line, Col: t.column + len(text)}
-		span := Span{End: end}
-		t.advance(len(text))
-		return NewLabelToken(text, labelData.Expecting, labelData.In, span)
-	}
+		case CustomLabel:
+			labelData := entry.Data.(LabelTokenData)
+			t.advance(len(text))
+			return NewLabelToken(text, labelData.Expecting, labelData.In, span)
 
-	// Check custom compound rules
-	if compoundData, exists := t.rules.CompoundTokens[text]; exists {
-		end := Position{Line: t.line, Col: t.column + len(text)}
-		span := Span{End: end}
-		t.advance(len(text))
-		return NewCompoundToken(text, compoundData.Expecting, compoundData.In, span)
-	}
+		case CustomCompound:
+			compoundData := entry.Data.(CompoundTokenData)
+			t.advance(len(text))
+			return NewCompoundToken(text, compoundData.Expecting, compoundData.In, span)
 
-	// Check custom prefix rules
-	if t.rules.PrefixTokens != nil {
-		if _, exists := t.rules.PrefixTokens[text]; exists {
-			end := Position{Line: t.line, Col: t.column + len(text)}
-			span := Span{End: end}
+		case CustomPrefix:
 			t.advance(len(text))
 			return NewToken(text, PrefixToken, span)
-		}
-	}
 
-	// Check custom operator rules
-	if precedence, exists := t.rules.OperatorPrecedences[text]; exists {
-		end := Position{Line: t.line, Col: t.column + len(text)}
-		span := Span{End: end}
-		t.advance(len(text))
-		return NewOperatorToken(text, precedence[0], precedence[1], precedence[2], span)
-	}
+		case CustomOperator:
+			precedence := entry.Data.([3]int)
+			t.advance(len(text))
+			return NewOperatorToken(text, precedence[0], precedence[1], precedence[2], span)
 
-	// Check custom delimiter rules (open delimiters)
-	if closedBy, exists := t.rules.DelimiterMappings[text]; exists {
-		end := Position{Line: t.line, Col: t.column + len(text)}
-		span := Span{End: end}
+		case CustomOpenDelimiter:
+			delimiterData := entry.Data.(struct {
+				ClosedBy []string
+				IsInfix  bool
+				IsPrefix bool
+			})
+			t.advance(len(text))
+			return NewDelimiterToken(text, delimiterData.ClosedBy, delimiterData.IsInfix, delimiterData.IsPrefix, span)
 
-		props := t.rules.DelimiterProperties[text]
-		isInfix, isPrefix := props[0], props[1]
-
-		t.advance(len(text))
-		return NewDelimiterToken(text, closedBy, isInfix, isPrefix, span)
-	}
-
-	// Check if this is a custom close delimiter
-	for _, closedByList := range t.rules.DelimiterMappings {
-		for _, closer := range closedByList {
-			if text == closer {
-				end := Position{Line: t.line, Col: t.column + len(text)}
-				span := Span{End: end}
-				t.advance(len(text))
-				return NewToken(text, CloseDelimiter, span)
-			}
+		case CustomCloseDelimiter:
+			t.advance(len(text))
+			return NewToken(text, CloseDelimiter, span)
 		}
 	}
 

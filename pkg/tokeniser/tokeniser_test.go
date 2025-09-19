@@ -438,6 +438,9 @@ func TestCustomRulesWildcard(t *testing.T) {
 		OperatorPrecedences: make(map[string][3]int),
 	}
 
+	// Build the precomputed lookup map
+	rules.BuildTokenLookup()
+
 	// Test with custom wildcard in a def context
 	tokeniser := NewWithRules("def foo *", rules)
 	tokens, err := tokeniser.Tokenise()

@@ -20,3 +20,10 @@ The `if` keyword establishes the expectation of a following `then`. So when the
 Note that the text and span info preserved, the attributes of `then` are copied
 over and a new attribute `value` has been added. The value attribute dictates
 the name of the form-part to the parser.
+
+## Unhappy path
+
+What happens when a wildcard-label is used outside of a context which establishes
+the `expecting`? It falls-back to being unclassified.
+
+

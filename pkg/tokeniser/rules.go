@@ -63,6 +63,27 @@ type OperatorRule struct {
 	Precedence [3]int `yaml:"precedence"` // [prefix, infix, postfix]
 }
 
+// CustomRuleType represents the type of custom rule
+type CustomRuleType int
+
+const (
+	CustomWildcard CustomRuleType = iota
+	CustomStart
+	CustomEnd
+	CustomLabel
+	CustomCompound
+	CustomPrefix
+	CustomOperator
+	CustomOpenDelimiter
+	CustomCloseDelimiter
+)
+
+// CustomRuleEntry holds the rule type and any associated data
+type CustomRuleEntry struct {
+	Type CustomRuleType
+	Data interface{} // Can be StartTokenData, LabelTokenData, etc.
+}
+
 // TokeniserRules holds all the rule maps that can be customized
 type TokeniserRules struct {
 	StartTokens         map[string]StartTokenData
@@ -73,11 +94,14 @@ type TokeniserRules struct {
 	DelimiterProperties map[string][2]bool
 	WildcardTokens      map[string]bool
 	OperatorPrecedences map[string][3]int // [prefix, infix, postfix]
+
+	// Precomputed lookup map for efficient matching
+	TokenLookup map[string][]CustomRuleEntry
 }
 
 // DefaultRules returns the default tokeniser rules
 func DefaultRules() *TokeniserRules {
-	return &TokeniserRules{
+	rules := &TokeniserRules{
 		StartTokens:         getDefaultStartTokens(),
 		LabelTokens:         getDefaultLabelTokens(),
 		CompoundTokens:      getDefaultCompoundTokens(),
@@ -87,6 +111,11 @@ func DefaultRules() *TokeniserRules {
 		WildcardTokens:      getDefaultWildcardTokens(),
 		OperatorPrecedences: make(map[string][3]int),
 	}
+
+	// Build the precomputed lookup map
+	rules.BuildTokenLookup()
+
+	return rules
 }
 
 // LoadRulesFile loads and parses a YAML rules file
@@ -174,6 +203,9 @@ func ApplyRulesToDefaults(rules *RulesFile) *TokeniserRules {
 			tokeniserRules.OperatorPrecedences[rule.Text] = rule.Precedence
 		}
 	}
+
+	// Build the precomputed lookup map for efficient matching
+	tokeniserRules.BuildTokenLookup()
 
 	return tokeniserRules
 }
@@ -280,5 +312,96 @@ func getDefaultDelimiterProperties() map[string][2]bool {
 func getDefaultWildcardTokens() map[string]bool {
 	return map[string]bool{
 		":": true,
+	}
+}
+
+// BuildTokenLookup creates the precomputed lookup map for efficient token matching
+func (rules *TokeniserRules) BuildTokenLookup() {
+	rules.TokenLookup = make(map[string][]CustomRuleEntry)
+
+	// Add wildcard tokens
+	for token := range rules.WildcardTokens {
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: CustomWildcard,
+			Data: nil,
+		})
+	}
+
+	// Add start tokens
+	for token, data := range rules.StartTokens {
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: CustomStart,
+			Data: data,
+		})
+	}
+
+	// Add label tokens
+	for token, data := range rules.LabelTokens {
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: CustomLabel,
+			Data: data,
+		})
+	}
+
+	// Add compound tokens
+	for token, data := range rules.CompoundTokens {
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: CustomCompound,
+			Data: data,
+		})
+	}
+
+	// Add prefix tokens
+	for token := range rules.PrefixTokens {
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: CustomPrefix,
+			Data: nil,
+		})
+	}
+
+	// Add operator tokens
+	for token, precedence := range rules.OperatorPrecedences {
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: CustomOperator,
+			Data: precedence,
+		})
+	}
+
+	// Add open delimiter tokens
+	for token, closedBy := range rules.DelimiterMappings {
+		props := rules.DelimiterProperties[token]
+		delimiterData := struct {
+			ClosedBy []string
+			IsInfix  bool
+			IsPrefix bool
+		}{
+			ClosedBy: closedBy,
+			IsInfix:  props[0],
+			IsPrefix: props[1],
+		}
+		rules.TokenLookup[token] = append(rules.TokenLookup[token], CustomRuleEntry{
+			Type: CustomOpenDelimiter,
+			Data: delimiterData,
+		})
+	}
+
+	// Add close delimiter tokens (derived from closed_by fields)
+	for _, closedByList := range rules.DelimiterMappings {
+		for _, closer := range closedByList {
+			rules.TokenLookup[closer] = append(rules.TokenLookup[closer], CustomRuleEntry{
+				Type: CustomCloseDelimiter,
+				Data: nil,
+			})
+		}
+	}
+
+	// Add end tokens (derived from start token closed_by fields)
+	for _, startData := range rules.StartTokens {
+		for _, endToken := range startData.ClosedBy {
+			rules.TokenLookup[endToken] = append(rules.TokenLookup[endToken], CustomRuleEntry{
+				Type: CustomEnd,
+				Data: nil,
+			})
+		}
 	}
 }
