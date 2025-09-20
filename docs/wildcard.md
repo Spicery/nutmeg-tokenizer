@@ -1,6 +1,6 @@
 # The Wildcard Label `:`
 
-The token `:` has a special role. When it is encountered, the tokeniser asks
+The token `:` has a special role. When it is encountered, the tokenizer asks
 what label X was expected in this context. The attributes of X are then copied
 onto this token!
 
@@ -11,7 +11,7 @@ if x:
 endif
 ```
 The `if` keyword establishes the expectation of a following `then`. So when the
-`:` token is encountered the tokeniser emits this:
+`:` token is encountered the tokenizer emits this:
 
 ```json
 {"text":":","span":[1,1,1,2],"type":"L","expecting":["else","elseif","elseifnot","catch"],"in":["try","if"],"value":"then"}

@@ -1,10 +1,10 @@
-# Nutmeg Tokeniser - a standalone tokeniser for the Nutmeg project
+# Nutmeg Tokenizer - a standalone tokenizer for the Nutmeg project
 
 ## Tokens
 
-We are collaborating on the development of a standalone tokeniser for the Nutmeg
+We are collaborating on the development of a standalone tokenizer for the Nutmeg
 programming language, implemented in the Go programming language. Given a source
-code file, the tokeniser outputs a list of tokens in JSON format. It will handle
+code file, the tokenizer outputs a list of tokens in JSON format. It will handle
 the following token types:
 
 - Literal constants:
@@ -23,7 +23,7 @@ the following token types:
 -   U - Unclassified
 -   X - Exception token (used for tokens that should never appear in valid code, e.g. invalid number literals)
 
-The tokeniser will ignore whitespace and comments, end of line comments starting
+The tokenizer will ignore whitespace and comments, end of line comments starting
 with `###`.
 
 ##  Output Format
@@ -70,8 +70,8 @@ Each token will be represented as a JSON object on a single line, with the follo
 
 ## Test Guidelines
 
-- When testing the behaviour of the binary, always use `go run ./cmd/nutmeg-tokeniser`
-  rather than `./nutmeg-tokeniser` directory. This ensures you are always testing
+- When testing the behaviour of the binary, always use `go run ./cmd/nutmeg-tokenizer`
+  rather than `./nutmeg-tokenizer` directory. This ensures you are always testing
   the latest code rather than an out-of-date compiled binary. (Unless you are 
   deliberately testing an out-of-date binary).
   

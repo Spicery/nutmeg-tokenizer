@@ -1,4 +1,4 @@
-package tokeniser
+package tokenizer
 
 import (
 	"encoding/json"

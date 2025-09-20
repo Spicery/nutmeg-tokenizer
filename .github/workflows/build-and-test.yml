@@ -43,13 +43,13 @@ jobs:
       run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
     
     - name: Build
-      run: go build -v -o nutmeg-tokeniser ./cmd/nutmeg-tokeniser
+      run: go build -v -o nutmeg-tokenizer ./cmd/nutmeg-tokenizer
     
     - name: Upload binary artifact
       uses: actions/upload-artifact@v4
       with:
-        name: nutmeg-tokeniser-${{ matrix.go-version }}
-        path: nutmeg-tokeniser
+        name: nutmeg-tokenizer-${{ matrix.go-version }}
+        path: nutmeg-tokenizer
         retention-days: 1
     
     - name: Upload coverage to Codecov
@@ -107,12 +107,12 @@ jobs:
         cache: false
 
     - name: Build
-      run: go build -o nutmeg-tokeniser ./cmd/nutmeg-tokeniser
+      run: go build -o nutmeg-tokenizer ./cmd/nutmeg-tokenizer
 
     - name: Test with example files
       run: |
-        ./nutmeg-tokeniser --input examples/simple.nutmeg > /tmp/simple_output.json
-        ./nutmeg-tokeniser --input examples/numeric.nutmeg > /tmp/numeric_output.json
+        ./nutmeg-tokenizer --input examples/simple.nutmeg > /tmp/simple_output.json
+        ./nutmeg-tokenizer --input examples/numeric.nutmeg > /tmp/numeric_output.json
         
         # Verify the outputs are valid JSON
         cat /tmp/simple_output.json | jq . > /dev/null
@@ -131,7 +131,7 @@ jobs:
 
     - name: Test stdin input
       run: |
-        echo "def test end" | ./nutmeg-tokeniser > /tmp/stdin_output.json
+        echo "def test end" | ./nutmeg-tokenizer > /tmp/stdin_output.json
         cat /tmp/stdin_output.json | jq . > /dev/null
         
         # Should have at least 3 tokens (def, test, end)
@@ -142,7 +142,7 @@ jobs:
 
     - name: Test newline tracking
       run: |
-        echo -e "a\nb" | ./nutmeg-tokeniser > /tmp/newline_output.json
+        echo -e "a\nb" | ./nutmeg-tokenizer > /tmp/newline_output.json
         cat /tmp/newline_output.json | jq . > /dev/null
         
         # Check that first token has ln_after and second has ln_before

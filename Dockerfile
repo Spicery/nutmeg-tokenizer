@@ -8,10 +8,10 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app/
 
 # Copy the pre-built binary (provided by GoReleaser)
-COPY nutmeg-tokeniser .
+COPY nutmeg-tokenizer .
 
 # Set execute permissions on the binary
-RUN chmod +x nutmeg-tokeniser
+RUN chmod +x nutmeg-tokenizer
 
 # Create a non-root user
 RUN adduser -D -s /bin/sh appuser
@@ -21,4 +21,4 @@ RUN chown -R appuser:appuser /app
 
 USER appuser
 
-ENTRYPOINT ["/app/nutmeg-tokeniser"]
+ENTRYPOINT ["/app/nutmeg-tokenizer"]

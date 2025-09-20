@@ -1,4 +1,4 @@
-package tokeniser
+package tokenizer
 
 import (
 	"fmt"
@@ -8,15 +8,15 @@ import (
 	"unicode/utf8"
 )
 
-// Tokeniser represents the main tokeniser structure.
-type Tokeniser struct {
+// Tokenizer represents the main tokenizer structure.
+type Tokenizer struct {
 	input          string
 	position       int
 	line           int
 	column         int
 	tokens         []*Token
 	expectingStack [][]string      // Stack of expecting arrays for context tracking
-	rules          *TokeniserRules // Custom rules for this tokeniser instance
+	rules          *TokenizerRules // Custom rules for this tokenizer instance
 }
 
 // Regular expressions for token matching
@@ -196,9 +196,9 @@ var delimiterProperties = map[string][2]bool{
 	"{": {true, true},  // infix=false, prefix=true
 }
 
-// New creates a new tokeniser instance with default rules.
-func New(input string) *Tokeniser {
-	return &Tokeniser{
+// New creates a new tokenizer instance with default rules.
+func New(input string) *Tokenizer {
+	return &Tokenizer{
 		input:          input,
 		line:           1,
 		column:         1,
@@ -208,9 +208,9 @@ func New(input string) *Tokeniser {
 	}
 }
 
-// NewWithRules creates a new tokeniser instance with custom rules.
-func NewWithRules(input string, rules *TokeniserRules) *Tokeniser {
-	return &Tokeniser{
+// NewWithRules creates a new tokenizer instance with custom rules.
+func NewWithRules(input string, rules *TokenizerRules) *Tokenizer {
+	return &Tokenizer{
 		input:          input,
 		line:           1,
 		column:         1,
@@ -222,21 +222,21 @@ func NewWithRules(input string, rules *TokeniserRules) *Tokeniser {
 
 // Helper methods to access rules with fallback to global variables
 
-func (t *Tokeniser) getStartTokens() map[string]StartTokenData {
+func (t *Tokenizer) getStartTokens() map[string]StartTokenData {
 	if t.rules != nil {
 		return t.rules.StartTokens
 	}
 	return startTokens
 }
 
-func (t *Tokeniser) getLabelTokens() map[string]LabelTokenData {
+func (t *Tokenizer) getLabelTokens() map[string]LabelTokenData {
 	if t.rules != nil {
 		return t.rules.LabelTokens
 	}
 	return labelTokens
 }
 
-func (t *Tokeniser) getWildcardTokens() map[string]bool {
+func (t *Tokenizer) getWildcardTokens() map[string]bool {
 	if t.rules != nil {
 		return t.rules.WildcardTokens
 	}
@@ -244,7 +244,7 @@ func (t *Tokeniser) getWildcardTokens() map[string]bool {
 	return map[string]bool{":": true}
 }
 
-func (t *Tokeniser) getDelimiterMappings() map[string][]string {
+func (t *Tokenizer) getDelimiterMappings() map[string][]string {
 	if t.rules != nil {
 		return t.rules.DelimiterMappings
 	}
@@ -252,19 +252,19 @@ func (t *Tokeniser) getDelimiterMappings() map[string][]string {
 }
 
 // pushExpecting pushes a new set of expected tokens onto the stack.
-func (t *Tokeniser) pushExpecting(expected []string) {
+func (t *Tokenizer) pushExpecting(expected []string) {
 	t.expectingStack = append(t.expectingStack, expected)
 }
 
 // popExpecting removes the top set of expected tokens from the stack.
-func (t *Tokeniser) popExpecting() {
+func (t *Tokenizer) popExpecting() {
 	if len(t.expectingStack) > 0 {
 		t.expectingStack = t.expectingStack[:len(t.expectingStack)-1]
 	}
 }
 
 // getCurrentlyExpected returns the currently expected tokens, or nil if stack is empty.
-func (t *Tokeniser) getCurrentlyExpected() []string {
+func (t *Tokenizer) getCurrentlyExpected() []string {
 	if len(t.expectingStack) == 0 {
 		return nil
 	}
@@ -272,7 +272,7 @@ func (t *Tokeniser) getCurrentlyExpected() []string {
 }
 
 // addTokenAndManageStack adds a token to the tokens slice and manages the expecting stack.
-func (t *Tokeniser) addTokenAndManageStack(token *Token) error {
+func (t *Tokenizer) addTokenAndManageStack(token *Token) error {
 	// Check if numeric token is valid before adding it
 	if token.Type == NumericLiteral {
 		if valid, reason := token.isValidNumber(); !valid {
@@ -347,8 +347,10 @@ func (t *Tokeniser) addTokenAndManageStack(token *Token) error {
 		}
 	}
 	return nil
-} // Tokenise processes the input and returns a slice of tokens.
-func (t *Tokeniser) Tokenise() ([]*Token, error) {
+}
+
+// Tokenize processes the input and returns a slice of tokens.
+func (t *Tokenizer) Tokenize() ([]*Token, error) {
 	for t.position < len(t.input) {
 		if err := t.nextToken(); err != nil {
 			return t.tokens, err
@@ -358,7 +360,7 @@ func (t *Tokeniser) Tokenise() ([]*Token, error) {
 }
 
 // nextToken processes the next token from the input.
-func (t *Tokeniser) nextToken() error {
+func (t *Tokenizer) nextToken() error {
 	// Skip whitespace and comments, tracking if we saw a newline
 	sawNewlineBefore := t.skipWhitespaceAndComments()
 
@@ -451,7 +453,7 @@ func (t *Tokeniser) nextToken() error {
 
 // skipWhitespaceAndComments advances past whitespace characters and comments.
 // Returns true if a newline (LF or CR) was encountered in the skipped content.
-func (t *Tokeniser) skipWhitespaceAndComments() bool {
+func (t *Tokenizer) skipWhitespaceAndComments() bool {
 	sawNewline := false
 
 	for t.position < len(t.input) {
@@ -480,7 +482,7 @@ func (t *Tokeniser) skipWhitespaceAndComments() bool {
 }
 
 // matchString attempts to match a string literal.
-func (t *Tokeniser) matchString() *Token {
+func (t *Tokenizer) matchString() *Token {
 	if t.position >= len(t.input) {
 		return nil
 	}
@@ -536,7 +538,7 @@ func (t *Tokeniser) matchString() *Token {
 }
 
 // matchNumeric attempts to match a numeric literal.
-func (t *Tokeniser) matchNumeric() *Token {
+func (t *Tokenizer) matchNumeric() *Token {
 	// First try to match radix-based numbers (must check before decimal)
 	if radixMatch := radixRegex.FindStringSubmatch(t.input[t.position:]); radixMatch != nil {
 		return t.parseRadixNumber(radixMatch)
@@ -551,7 +553,7 @@ func (t *Tokeniser) matchNumeric() *Token {
 }
 
 // parseRadixNumber parses a number with radix notation (e.g., 0x, 0o, 0b, 0t, or nr).
-func (t *Tokeniser) parseRadixNumber(match []string) *Token {
+func (t *Tokenizer) parseRadixNumber(match []string) *Token {
 	fullMatch := match[0]
 	radixPart := match[1]
 	mantissa := match[2]
@@ -649,7 +651,7 @@ func (t *Tokeniser) parseRadixNumber(match []string) *Token {
 }
 
 // parseDecimalNumber parses a decimal number.
-func (t *Tokeniser) parseDecimalNumber(match []string) *Token {
+func (t *Tokenizer) parseDecimalNumber(match []string) *Token {
 	fullMatch := match[0]
 	mantissa := match[1]
 	fraction := ""
@@ -676,7 +678,7 @@ func (t *Tokeniser) parseDecimalNumber(match []string) *Token {
 }
 
 // createExceptionToken creates an exception token for invalid numeric formats.
-func (t *Tokeniser) createExceptionToken(text, reason string) *Token {
+func (t *Tokenizer) createExceptionToken(text, reason string) *Token {
 	end := Position{Line: t.line, Col: t.column + len(text)}
 	span := Span{End: end}
 	t.advance(len(text))
@@ -684,7 +686,7 @@ func (t *Tokeniser) createExceptionToken(text, reason string) *Token {
 }
 
 // matchIdentifier attempts to match an identifier.
-func (t *Tokeniser) matchIdentifier() *Token {
+func (t *Tokenizer) matchIdentifier() *Token {
 	match := identifierRegex.FindString(t.input[t.position:])
 	if match == "" {
 		return nil
@@ -741,7 +743,7 @@ func (t *Tokeniser) matchIdentifier() *Token {
 }
 
 // matchSpecialLabels attempts to match special label sequences like '=>>' and wildcard ':'
-func (t *Tokeniser) matchSpecialLabels() *Token {
+func (t *Tokenizer) matchSpecialLabels() *Token {
 	// Check for '=>>' special label
 	if strings.HasPrefix(t.input[t.position:], "=>>") {
 		end := Position{Line: t.line, Col: t.column + 3}
@@ -807,7 +809,7 @@ func (t *Tokeniser) matchSpecialLabels() *Token {
 
 // matchCustomRules checks for any custom rules that match at the current position.
 // Custom rules take precedence over default rules.
-func (t *Tokeniser) matchCustomRules() *Token {
+func (t *Tokenizer) matchCustomRules() *Token {
 	if t.rules == nil || t.rules.TokenLookup == nil {
 		return nil // No custom rules
 	}
@@ -927,7 +929,7 @@ func (t *Tokeniser) matchCustomRules() *Token {
 }
 
 // matchOperator attempts to match an operator.
-func (t *Tokeniser) matchOperator() *Token {
+func (t *Tokenizer) matchOperator() *Token {
 	match := operatorRegex.FindString(t.input[t.position:])
 	if match == "" {
 		return nil
@@ -978,7 +980,7 @@ func (t *Tokeniser) matchOperator() *Token {
 
 // matchDelimiter attempts to match a delimiter using default rules only.
 // This is only called when no custom bracket rules are defined.
-func (t *Tokeniser) matchDelimiter() *Token {
+func (t *Tokenizer) matchDelimiter() *Token {
 	if t.position >= len(t.input) {
 		return nil
 	}
@@ -1010,7 +1012,7 @@ func (t *Tokeniser) matchDelimiter() *Token {
 }
 
 // advance moves the position forward and updates line/column tracking.
-func (t *Tokeniser) advance(n int) {
+func (t *Tokenizer) advance(n int) {
 	for i := 0; i < n && t.position < len(t.input); i++ {
 		if t.input[t.position] == '\n' {
 			t.line++

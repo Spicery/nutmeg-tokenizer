@@ -1,4 +1,4 @@
-package tokeniser
+package tokenizer
 
 import (
 	"fmt"
@@ -84,8 +84,8 @@ type CustomRuleEntry struct {
 	Data interface{} // Can be StartTokenData, LabelTokenData, etc.
 }
 
-// TokeniserRules holds all the rule maps that can be customized
-type TokeniserRules struct {
+// TokenizerRules holds all the rule maps that can be customized
+type TokenizerRules struct {
 	StartTokens         map[string]StartTokenData
 	LabelTokens         map[string]LabelTokenData
 	CompoundTokens      map[string]CompoundTokenData
@@ -99,9 +99,9 @@ type TokeniserRules struct {
 	TokenLookup map[string]CustomRuleEntry
 }
 
-// DefaultRules returns the default tokeniser rules
-func DefaultRules() *TokeniserRules {
-	rules := &TokeniserRules{
+// DefaultRules returns the default tokenizer rules
+func DefaultRules() *TokenizerRules {
+	rules := &TokenizerRules{
 		StartTokens:         getDefaultStartTokens(),
 		LabelTokens:         getDefaultLabelTokens(),
 		CompoundTokens:      getDefaultCompoundTokens(),
@@ -136,35 +136,35 @@ func LoadRulesFile(filename string) (*RulesFile, error) {
 	return &rules, nil
 }
 
-// ApplyRulesToDefaults applies the rules from a RulesFile to create a new TokeniserRules.
+// ApplyRulesToDefaults applies the rules from a RulesFile to create a new TokenizerRules.
 // Returns an error if there are conflicting token definitions.
-func ApplyRulesToDefaults(rules *RulesFile) (*TokeniserRules, error) {
-	tokeniserRules := DefaultRules()
+func ApplyRulesToDefaults(rules *RulesFile) (*TokenizerRules, error) {
+	tokenizerRules := DefaultRules()
 
 	// Apply bracket rules
 	if len(rules.Bracket) > 0 {
-		tokeniserRules.DelimiterMappings = make(map[string][]string)
-		tokeniserRules.DelimiterProperties = make(map[string][2]bool)
+		tokenizerRules.DelimiterMappings = make(map[string][]string)
+		tokenizerRules.DelimiterProperties = make(map[string][2]bool)
 
 		for _, rule := range rules.Bracket {
-			tokeniserRules.DelimiterMappings[rule.Text] = rule.ClosedBy
-			tokeniserRules.DelimiterProperties[rule.Text] = [2]bool{rule.Infix, rule.Prefix}
+			tokenizerRules.DelimiterMappings[rule.Text] = rule.ClosedBy
+			tokenizerRules.DelimiterProperties[rule.Text] = [2]bool{rule.Infix, rule.Prefix}
 		}
 	}
 
 	// Apply prefix rules
 	if len(rules.Prefix) > 0 {
-		tokeniserRules.PrefixTokens = make(map[string]bool)
+		tokenizerRules.PrefixTokens = make(map[string]bool)
 		for _, rule := range rules.Prefix {
-			tokeniserRules.PrefixTokens[rule.Text] = true
+			tokenizerRules.PrefixTokens[rule.Text] = true
 		}
 	}
 
 	// Apply start rules
 	if len(rules.Start) > 0 {
-		tokeniserRules.StartTokens = make(map[string]StartTokenData)
+		tokenizerRules.StartTokens = make(map[string]StartTokenData)
 		for _, rule := range rules.Start {
-			tokeniserRules.StartTokens[rule.Text] = StartTokenData{
+			tokenizerRules.StartTokens[rule.Text] = StartTokenData{
 				Expecting: rule.Expecting,
 				ClosedBy:  rule.ClosedBy,
 			}
@@ -173,9 +173,9 @@ func ApplyRulesToDefaults(rules *RulesFile) (*TokeniserRules, error) {
 
 	// Apply label rules
 	if len(rules.Label) > 0 {
-		tokeniserRules.LabelTokens = make(map[string]LabelTokenData)
+		tokenizerRules.LabelTokens = make(map[string]LabelTokenData)
 		for _, rule := range rules.Label {
-			tokeniserRules.LabelTokens[rule.Text] = LabelTokenData{
+			tokenizerRules.LabelTokens[rule.Text] = LabelTokenData{
 				Expecting: rule.Expecting,
 				In:        rule.In,
 			}
@@ -184,9 +184,9 @@ func ApplyRulesToDefaults(rules *RulesFile) (*TokeniserRules, error) {
 
 	// Apply compound rules
 	if len(rules.Compound) > 0 {
-		tokeniserRules.CompoundTokens = make(map[string]CompoundTokenData)
+		tokenizerRules.CompoundTokens = make(map[string]CompoundTokenData)
 		for _, rule := range rules.Compound {
-			tokeniserRules.CompoundTokens[rule.Text] = CompoundTokenData{
+			tokenizerRules.CompoundTokens[rule.Text] = CompoundTokenData{
 				Expecting: rule.Expecting,
 				In:        rule.In,
 			}
@@ -195,25 +195,25 @@ func ApplyRulesToDefaults(rules *RulesFile) (*TokeniserRules, error) {
 
 	// Apply wildcard rules
 	if len(rules.Wildcard) > 0 {
-		tokeniserRules.WildcardTokens = make(map[string]bool)
+		tokenizerRules.WildcardTokens = make(map[string]bool)
 		for _, rule := range rules.Wildcard {
-			tokeniserRules.WildcardTokens[rule.Text] = true
+			tokenizerRules.WildcardTokens[rule.Text] = true
 		}
 	}
 
 	// Apply operator rules
 	if len(rules.Operator) > 0 {
 		for _, rule := range rules.Operator {
-			tokeniserRules.OperatorPrecedences[rule.Text] = rule.Precedence
+			tokenizerRules.OperatorPrecedences[rule.Text] = rule.Precedence
 		}
 	}
 
 	// Build the precomputed lookup map for efficient matching
-	if err := tokeniserRules.BuildTokenLookup(); err != nil {
+	if err := tokenizerRules.BuildTokenLookup(); err != nil {
 		return nil, err
 	}
 
-	return tokeniserRules, nil
+	return tokenizerRules, nil
 }
 
 // Helper functions to get default values (these will copy from the existing global variables)
@@ -323,7 +323,7 @@ func getDefaultWildcardTokens() map[string]bool {
 
 // BuildTokenLookup creates the precomputed lookup map for efficient token matching.
 // Returns an error if a token is defined in multiple rules.
-func (rules *TokeniserRules) BuildTokenLookup() error {
+func (rules *TokenizerRules) BuildTokenLookup() error {
 	rules.TokenLookup = make(map[string]CustomRuleEntry)
 	tokenSources := make(map[string]string) // Track which rule type defined each token
 

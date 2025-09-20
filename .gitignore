@@ -31,7 +31,7 @@ tmp/
 # Build output
 build/
 dist/
-/nutmeg-tokeniser
+nutmeg-tokenizer
 /bin/
 
 # External tools (downloaded/installed, not committed)

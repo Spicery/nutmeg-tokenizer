@@ -1,7 +1,7 @@
 # GoReleaser configuration
 version: 2
 
-project_name: nutmeg-tokeniser
+project_name: nutmeg-tokenizer
 
 before:
   hooks:
@@ -9,8 +9,8 @@ before:
     - go generate ./...
 
 builds:
-  - main: ./cmd/nutmeg-tokeniser
-    binary: nutmeg-tokeniser
+  - main: ./cmd/nutmeg-tokenizer
+    binary: nutmeg-tokenizer
     env:
       - CGO_ENABLED=0
     goos:
@@ -67,7 +67,7 @@ changelog:
 release:
   github:
     owner: Spicery
-    name: nutmeg-tokeniser
+    name: nutmeg-tokenizer
   draft: false
   prerelease: auto
   name_template: "Release {{.Tag}}"
@@ -79,8 +79,8 @@ release:
     Docker images are available on Docker Hub:
     
     ```bash
-    docker pull spicery/nutmeg-tokeniser:{{.Tag}}
-    docker pull spicery/nutmeg-tokeniser:latest
+    docker pull spicery/nutmeg-tokenizer:{{.Tag}}
+    docker pull spicery/nutmeg-tokenizer:latest
     ```
     
     ## Usage
@@ -89,8 +89,8 @@ release:
     
     ```bash
     # Tokenize a file
-    ./nutmeg-tokeniser --input source.nutmeg --output tokens.json
+    ./nutmeg-tokenizer --input source.nutmeg --output tokens.json
     
     # Tokenize from stdin
-    echo "def foo end" | ./nutmeg-tokeniser
+    echo "def foo end" | ./nutmeg-tokenizer
     ```

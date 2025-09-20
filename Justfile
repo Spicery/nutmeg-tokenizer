@@ -36,4 +36,5 @@ tidy:
     go mod tidy
 
 build:
-    go build -o bin/nutmeg-tokeniser ./cmd/nutmeg-tokeniser
+    mkdir -p bin
+    go build -o bin/nutmeg-tokenizer ./cmd/nutmeg-tokenizer

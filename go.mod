@@ -1,4 +1,4 @@
-module github.com/spicery/nutmeg-tokeniser
+module github.com/spicery/nutmeg-tokenizer
 
 go 1.24.2
 

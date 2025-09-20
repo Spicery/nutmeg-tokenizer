@@ -1,8 +1,8 @@
-# Error Handling in the Nutmeg Tokeniser
+# Error Handling in the Nutmeg Tokenizer
 
 ## Approach
 
-The tokeniser will typically be used within a pipeline and simply crashing
+The tokenizer will typically be used within a pipeline and simply crashing
 the pipeline is not very user-friendly. The strategy is:
 
 - When an error is found (e.g. invalid number token) an `X` (exception)

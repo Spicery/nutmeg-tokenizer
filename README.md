@@ -1,10 +1,10 @@
-# Nutmeg Tokeniser
+# Nutmeg Tokenizer
 
-A standalone tokeniser for the Nutmeg programming language, implemented in Go.
+A standalone tokenizer for the Nutmeg programming language, implemented in Go.
 
 ## Features
 
-- Tokenises Nutmeg source code into JSON format
+- Tokenizes Nutmeg source code into JSON format
 - Supports all Nutmeg token types including:
   - Numeric literals with multiple radixes (2-36)
   - String literals with escape sequences
@@ -17,7 +17,7 @@ A standalone tokeniser for the Nutmeg programming language, implemented in Go.
 ## Installation
 
 ```bash
-go build -o nutmeg-tokeniser ./cmd/nutmeg-tokeniser
+go build -o nutmeg-tokenizer ./cmd/nutmeg-tokenizer
 ```
 
 ## Usage
@@ -25,14 +25,14 @@ go build -o nutmeg-tokeniser ./cmd/nutmeg-tokeniser
 ### Command Line
 
 ```bash
-# Tokenise a file
-./nutmeg-tokeniser examples/simple.nutmeg
+# Tokenize a file
+./nutmeg-tokenizer examples/simple.nutmeg
 
 # Read from stdin
-echo "def hello end" | ./nutmeg-tokeniser -
+echo "def hello end" | ./nutmeg-tokenizer -
 
 # Show help
-./nutmeg-tokeniser --help
+./nutmeg-tokenizer --help
 ```
 
 ### As a Library
@@ -42,12 +42,12 @@ package main
 
 import (
     "fmt"
-    "github.com/spicery/nutmeg-tokeniser/pkg/tokeniser"
+    "github.com/spicery/nutmeg-tokenizer/pkg/tokenizer"
 )
 
 func main() {
-    t := tokeniser.New("def hello(name) name end")
-    tokens, err := t.Tokenise()
+    t := tokenizer.New("def hello(name) name end")
+    tokens, err := t.Tokenize()
     if err != nil {
         panic(err)
     }
@@ -89,7 +89,7 @@ Each token is output as a JSON object with the following structure:
 ## Testing
 
 ```bash
-go test ./pkg/tokeniser
+go test ./pkg/tokenizer
 ```
 
 ## Examples
