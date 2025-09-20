@@ -508,7 +508,7 @@ func (t *Tokeniser) matchNumeric() *Token {
 		// Handle rR notation (e.g., 2r1010, 16rFF, 36rHELLO)
 		radixStr := match[:rIndex]
 		mantissa = match[rIndex+1:]
-		
+
 		// Parse radix from string
 		if len(radixStr) > 0 {
 			parsedRadix := 0
