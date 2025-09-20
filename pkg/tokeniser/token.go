@@ -90,6 +90,10 @@ type Token struct {
 
 	// Exception token fields
 	Reason *string `json:"reason,omitempty"` // For exception tokens - explanation of the error
+
+	// Newline tracking fields
+	LnBefore *bool `json:"ln_before,omitempty"` // True if token was preceded by a newline
+	LnAfter  *bool `json:"ln_after,omitempty"`  // True if token was followed by a newline
 }
 
 // NewToken creates a new token with the basic required fields.

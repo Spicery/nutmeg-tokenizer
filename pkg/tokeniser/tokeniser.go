@@ -284,6 +284,16 @@ func (t *Tokeniser) addTokenAndManageStack(token *Token) error {
 		}
 	}
 
+	// Check for newlines after this token's position
+	savedPosition := t.position
+	savedLine := t.line
+	savedColumn := t.column
+	sawNewlineAfter := t.skipWhitespaceAndComments()
+	t.position = savedPosition // Restore position since we're just peeking ahead
+	t.line = savedLine
+	t.column = savedColumn
+	token.LnAfter = &sawNewlineAfter
+
 	t.tokens = append(t.tokens, token)
 
 	// If this is an exception token, stop processing
@@ -347,8 +357,8 @@ func (t *Tokeniser) Tokenise() ([]*Token, error) {
 
 // nextToken processes the next token from the input.
 func (t *Tokeniser) nextToken() error {
-	// Skip whitespace
-	t.skipWhitespace()
+	// Skip whitespace and comments, tracking if we saw a newline
+	sawNewlineBefore := t.skipWhitespaceAndComments()
 
 	if t.position >= len(t.input) {
 		return nil
@@ -356,30 +366,37 @@ func (t *Tokeniser) nextToken() error {
 
 	start := Position{Line: t.line, Col: t.column}
 
-	// Skip comments
-	if t.matchComment() {
-		return nil
-	}
-
 	// Try to match different token types
 	if token := t.matchString(); token != nil {
 		token.Span.Start = start
+		if sawNewlineBefore {
+			token.LnBefore = &sawNewlineBefore
+		}
 		return t.addTokenAndManageStack(token)
 	}
 
 	if token := t.matchNumeric(); token != nil {
 		token.Span.Start = start
+		if sawNewlineBefore {
+			token.LnBefore = &sawNewlineBefore
+		}
 		return t.addTokenAndManageStack(token)
 	}
 
 	// Check custom rules first - they take precedence over defaults
 	if token := t.matchCustomRules(); token != nil {
 		token.Span.Start = start
+		if sawNewlineBefore {
+			token.LnBefore = &sawNewlineBefore
+		}
 		return t.addTokenAndManageStack(token)
 	}
 
 	if token := t.matchIdentifier(); token != nil {
 		token.Span.Start = start
+		if sawNewlineBefore {
+			token.LnBefore = &sawNewlineBefore
+		}
 		return t.addTokenAndManageStack(token)
 	}
 
@@ -387,6 +404,9 @@ func (t *Tokeniser) nextToken() error {
 	if t.rules == nil || len(t.rules.LabelTokens) == 0 {
 		if token := t.matchSpecialLabels(); token != nil {
 			token.Span.Start = start
+			if sawNewlineBefore {
+				token.LnBefore = &sawNewlineBefore
+			}
 			return t.addTokenAndManageStack(token)
 		}
 	}
@@ -395,6 +415,9 @@ func (t *Tokeniser) nextToken() error {
 	if t.rules == nil || len(t.rules.OperatorPrecedences) == 0 {
 		if token := t.matchOperator(); token != nil {
 			token.Span.Start = start
+			if sawNewlineBefore {
+				token.LnBefore = &sawNewlineBefore
+			}
 			return t.addTokenAndManageStack(token)
 		}
 	}
@@ -403,6 +426,9 @@ func (t *Tokeniser) nextToken() error {
 	if t.rules == nil || len(t.rules.DelimiterMappings) == 0 {
 		if token := t.matchDelimiter(); token != nil {
 			token.Span.Start = start
+			if sawNewlineBefore {
+				token.LnBefore = &sawNewlineBefore
+			}
 			return t.addTokenAndManageStack(token)
 		}
 	}
@@ -414,29 +440,41 @@ func (t *Tokeniser) nextToken() error {
 	span := Span{Start: start, End: end}
 
 	token := NewToken(text, UnclassifiedToken, span)
+	if sawNewlineBefore {
+		token.LnBefore = &sawNewlineBefore
+	}
 	t.advance(size)
 	return t.addTokenAndManageStack(token)
 }
 
-// skipWhitespace advances past whitespace characters.
-func (t *Tokeniser) skipWhitespace() {
+// skipWhitespaceAndComments advances past whitespace characters and comments.
+// Returns true if a newline (LF or CR) was encountered in the skipped content.
+func (t *Tokeniser) skipWhitespaceAndComments() bool {
+	sawNewline := false
+	
 	for t.position < len(t.input) {
+		// Check for comments first
+		if match := commentRegex.FindString(t.input[t.position:]); match != "" {
+			t.advance(len(match))
+			sawNewline = true // End-of-line comments always include a newline conceptually
+			continue
+		}
+		
+		// Check for whitespace
 		r, size := utf8.DecodeRuneInString(t.input[t.position:])
 		if !unicode.IsSpace(r) {
 			break
 		}
+		
+		// Check if this whitespace character is a newline
+		if r == '\n' || r == '\r' {
+			sawNewline = true
+		}
+		
 		t.advance(size)
 	}
-}
-
-// matchComment checks for and skips comments.
-func (t *Tokeniser) matchComment() bool {
-	match := commentRegex.FindString(t.input[t.position:])
-	if match != "" {
-		t.advance(len(match))
-		return true
-	}
-	return false
+	
+	return sawNewline
 }
 
 // matchString attempts to match a string literal.
