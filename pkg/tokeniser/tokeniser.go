@@ -1,6 +1,7 @@
 package tokeniser
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -23,7 +24,7 @@ var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
 	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
-	numericRegex    = regexp.MustCompile(`^(?:0x[0-9A-F]+(?:_[0-9A-F]+)*|0b[01]+(?:_[01]+)*|0o[0-7]+(?:_[0-7]+)*|0t[01T]+(?:_[01T]+)*|(?:[2-9]|[12]\d|3[0-6])r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z01T]*(?:_[0-9A-Z01T]+)*)?(?:e[+-]?\d+)?`)
+	numericRegex    = regexp.MustCompile(`^(?:\d+[xobt][0-9A-Z]+(?:_[0-9A-Z]+)*|\d+r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z01T]*(?:_[0-9A-Z01T]+)*)?(?:e[+-]?\d+)?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
 )
 
@@ -269,8 +270,25 @@ func (t *Tokeniser) getCurrentlyExpected() []string {
 }
 
 // addTokenAndManageStack adds a token to the tokens slice and manages the expecting stack.
-func (t *Tokeniser) addTokenAndManageStack(token *Token) {
+func (t *Tokeniser) addTokenAndManageStack(token *Token) error {
+	// Check if numeric token is valid before adding it
+	if token.Type == NumericLiteral {
+		if valid, reason := token.isValidNumber(); !valid {
+			// Replace the token with an exception token
+			exceptionToken := NewExceptionToken(token.Text, "invalid numeric literal: "+reason, token.Span)
+			t.tokens = append(t.tokens, exceptionToken)
+			return fmt.Errorf("tokenisation error at line %d, column %d: %s",
+				exceptionToken.Span.Start.Line, exceptionToken.Span.Start.Col, *exceptionToken.Reason)
+		}
+	}
+
 	t.tokens = append(t.tokens, token)
+
+	// If this is an exception token, stop processing
+	if token.Type == ExceptionToken {
+		return fmt.Errorf("tokenisation error at line %d, column %d: %s",
+			token.Span.Start.Line, token.Span.Start.Col, *token.Reason)
+	}
 
 	// Manage the expecting stack based on token type and text
 	switch token.Type {
@@ -314,11 +332,12 @@ func (t *Tokeniser) addTokenAndManageStack(token *Token) {
 			}
 		}
 	}
+	return nil
 } // Tokenise processes the input and returns a slice of tokens.
 func (t *Tokeniser) Tokenise() ([]*Token, error) {
 	for t.position < len(t.input) {
 		if err := t.nextToken(); err != nil {
-			return nil, err
+			return t.tokens, err
 		}
 	}
 	return t.tokens, nil
@@ -343,35 +362,30 @@ func (t *Tokeniser) nextToken() error {
 	// Try to match different token types
 	if token := t.matchString(); token != nil {
 		token.Span.Start = start
-		t.addTokenAndManageStack(token)
-		return nil
+		return t.addTokenAndManageStack(token)
 	}
 
 	if token := t.matchNumeric(); token != nil {
 		token.Span.Start = start
-		t.addTokenAndManageStack(token)
-		return nil
+		return t.addTokenAndManageStack(token)
 	}
 
 	// Check custom rules first - they take precedence over defaults
 	if token := t.matchCustomRules(); token != nil {
 		token.Span.Start = start
-		t.addTokenAndManageStack(token)
-		return nil
+		return t.addTokenAndManageStack(token)
 	}
 
 	if token := t.matchIdentifier(); token != nil {
 		token.Span.Start = start
-		t.addTokenAndManageStack(token)
-		return nil
+		return t.addTokenAndManageStack(token)
 	}
 
 	// Only use default special labels matching if no custom label rules are defined
 	if t.rules == nil || len(t.rules.LabelTokens) == 0 {
 		if token := t.matchSpecialLabels(); token != nil {
 			token.Span.Start = start
-			t.addTokenAndManageStack(token)
-			return nil
+			return t.addTokenAndManageStack(token)
 		}
 	}
 
@@ -379,8 +393,7 @@ func (t *Tokeniser) nextToken() error {
 	if t.rules == nil || len(t.rules.OperatorPrecedences) == 0 {
 		if token := t.matchOperator(); token != nil {
 			token.Span.Start = start
-			t.addTokenAndManageStack(token)
-			return nil
+			return t.addTokenAndManageStack(token)
 		}
 	}
 
@@ -388,8 +401,7 @@ func (t *Tokeniser) nextToken() error {
 	if t.rules == nil || len(t.rules.DelimiterMappings) == 0 {
 		if token := t.matchDelimiter(); token != nil {
 			token.Span.Start = start
-			t.addTokenAndManageStack(token)
-			return nil
+			return t.addTokenAndManageStack(token)
 		}
 	}
 
@@ -400,10 +412,8 @@ func (t *Tokeniser) nextToken() error {
 	span := Span{Start: start, End: end}
 
 	token := NewToken(text, UnclassifiedToken, span)
-	t.addTokenAndManageStack(token)
 	t.advance(size)
-
-	return nil
+	return t.addTokenAndManageStack(token)
 }
 
 // skipWhitespace advances past whitespace characters.
@@ -495,19 +505,42 @@ func (t *Tokeniser) matchNumeric() *Token {
 	var fraction, exponent string
 
 	// Determine radix and extract components
-	if strings.HasPrefix(match, "0b") {
-		radix = 2
-		mantissa = match[2:]
-	} else if strings.HasPrefix(match, "0o") {
-		radix = 8
-		mantissa = match[2:]
-	} else if strings.HasPrefix(match, "0x") {
+	if strings.Contains(match, "x") {
+		// Handle hex notation (0x prefix required)
+		xIndex := strings.Index(match, "x")
+		prefix := match[:xIndex]
+		if prefix != "0" {
+			// Invalid - only 0x is allowed, but we'll parse it and let validation catch it
+		}
 		radix = 16
-		mantissa = match[2:]
-	} else if strings.HasPrefix(match, "0t") {
-		// Handle balanced ternary (e.g., 0t10T, 0tT1.0)
+		mantissa = match[xIndex+1:]
+	} else if strings.Contains(match, "o") {
+		// Handle octal notation (0o prefix required)
+		oIndex := strings.Index(match, "o")
+		prefix := match[:oIndex]
+		if prefix != "0" {
+			// Invalid - only 0o is allowed, but we'll parse it and let validation catch it
+		}
+		radix = 8
+		mantissa = match[oIndex+1:]
+	} else if strings.Contains(match, "b") {
+		// Handle binary notation (0b prefix required)
+		bIndex := strings.Index(match, "b")
+		prefix := match[:bIndex]
+		if prefix != "0" {
+			// Invalid - only 0b is allowed, but we'll parse it and let validation catch it
+		}
+		radix = 2
+		mantissa = match[bIndex+1:]
+	} else if strings.Contains(match, "t") {
+		// Handle balanced ternary notation (0t prefix required)
+		tIndex := strings.Index(match, "t")
+		prefix := match[:tIndex]
+		if prefix != "0" {
+			// Invalid - only 0t is allowed, but we'll parse it and let validation catch it
+		}
 		radix = 3
-		mantissa = match[2:]
+		mantissa = match[tIndex+1:]
 
 		// Extract decimal point and fraction for balanced ternary
 		if dotIndex := strings.Index(mantissa, "."); dotIndex != -1 {
@@ -534,7 +567,31 @@ func (t *Tokeniser) matchNumeric() *Token {
 		span := Span{End: end}
 
 		t.advance(len(match))
-		return NewBalancedTernaryToken(match, mantissa, fraction, exponent, span)
+
+		// Create balanced ternary token
+		balanced := true
+		return &Token{
+			Text:     match,
+			Type:     NumericLiteral,
+			Span:     span,
+			Radix:    &radix,
+			Mantissa: &mantissa,
+			Fraction: func() *string {
+				if fraction != "" {
+					return &fraction
+				} else {
+					return nil
+				}
+			}(),
+			Exponent: func() *string {
+				if exponent != "" {
+					return &exponent
+				} else {
+					return nil
+				}
+			}(),
+			Balanced: &balanced,
+		}
 	} else if rIndex := strings.Index(match, "r"); rIndex != -1 {
 		// Handle rR notation (e.g., 2r1010, 16rFF, 36rHELLO)
 		radixStr := match[:rIndex]

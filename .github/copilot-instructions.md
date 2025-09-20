@@ -78,6 +78,12 @@ Each token will be represented as a JSON object on a single line, with the follo
 - Where defensive checks are added, include a comment explaining why they are
   appropriate (not necessary, since defensive checks are not necessary).
 
+## Test Guidelines
+
+- When testing the behaviour of the binary, always use `go run ./cmd/nutmeg-tokeniser`
+  rather than `./nutmeg-tokeniser` directory. This ensures you are always testing
+  the latest code rather than an out-of-date compiled binary. (Unless you are 
+  deliberately testing an out-of-date binary).
 
 ## Collaboration Guidelines
 

@@ -1,6 +1,9 @@
 package tokeniser
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // TokenType represents the different types of tokens in the Nutmeg language.
 type TokenType string
@@ -23,6 +26,7 @@ const (
 	OpenDelimiter     TokenType = "[" // Opening brackets/braces/parentheses
 	CloseDelimiter    TokenType = "]" // Closing brackets/braces/parentheses
 	UnclassifiedToken TokenType = "U" // Unclassified tokens
+	ExceptionToken    TokenType = "X" // Exception tokens for invalid constructs
 )
 
 // Position represents a line and column position in the source file.
@@ -82,6 +86,9 @@ type Token struct {
 	// Delimiter fields (for '[' tokens)
 	Infix  *bool `json:"infix,omitempty"`  // For delimiter infix usage
 	Prefix *bool `json:"prefix,omitempty"` // For delimiter prefix usage
+
+	// Exception token fields
+	Reason *string `json:"reason,omitempty"` // For exception tokens - explanation of the error
 }
 
 // NewToken creates a new token with the basic required fields.
@@ -252,4 +259,98 @@ func NewWildcardEndToken(text, expectedText string, span Span) *Token {
 		Span:  span,
 		Value: &expectedText,
 	}
+}
+
+// NewExceptionToken creates a new exception token with an error reason.
+func NewExceptionToken(text, reason string, span Span) *Token {
+	return &Token{
+		Text:   text,
+		Type:   ExceptionToken,
+		Span:   span,
+		Reason: &reason,
+	}
+}
+
+// isValidNumber checks if a numeric token represents a valid number.
+func (t *Token) isValidNumber() (bool, string) {
+	if t.Type != NumericLiteral {
+		return true, "" // Non-numeric tokens are always valid
+	}
+
+	if t.Radix == nil || t.Mantissa == nil {
+		return false, "missing radix or mantissa"
+	}
+
+	radix := *t.Radix
+	mantissa := *t.Mantissa
+	isBalanced := t.Balanced != nil && *t.Balanced
+
+	// Check prefix validity for x/o/b/t notation
+	text := t.Text
+	if strings.Contains(text, "x") || strings.Contains(text, "o") || strings.Contains(text, "b") || strings.Contains(text, "t") {
+		// Find the prefix character
+		var prefixIndex int
+		var found bool
+		for _, chars := range []string{"x", "o", "b", "t"} {
+			if idx := strings.Index(text, chars); idx != -1 {
+				prefixIndex = idx
+				found = true
+				break
+			}
+		}
+		if found {
+			prefix := text[:prefixIndex]
+			if prefix != "0" {
+				return false, "invalid literal"
+			}
+		}
+	}
+
+	// Validate mantissa digits
+	if !isValidDigitsForRadix(mantissa, radix, isBalanced) {
+		return false, "invalid literal"
+	}
+
+	// Validate fraction digits if present
+	if t.Fraction != nil && *t.Fraction != "" {
+		if !isValidDigitsForRadix(*t.Fraction, radix, isBalanced) {
+			return false, "invalid literal"
+		}
+	}
+
+	return true, ""
+}
+
+// isValidDigitsForRadix checks if all characters in a string are valid digits for the given radix.
+func isValidDigitsForRadix(digits string, radix int, allowBalancedTernary bool) bool {
+	for _, char := range digits {
+		// Skip underscores - they're allowed as separators
+		if char == '_' {
+			continue
+		}
+		if !isValidDigitForRadix(char, radix, allowBalancedTernary) {
+			return false
+		}
+	}
+	return true
+}
+
+// isValidDigitForRadix checks if a character is a valid digit for the given radix.
+func isValidDigitForRadix(char rune, radix int, allowBalancedTernary bool) bool {
+	// Handle balanced ternary special case
+	if allowBalancedTernary && radix == 3 && char == 'T' {
+		return true
+	}
+
+	// Handle numeric digits 0-9
+	if char >= '0' && char <= '9' {
+		return int(char-'0') < radix
+	}
+
+	// Handle alphabetic digits A-Z (for radix > 10)
+	if char >= 'A' && char <= 'Z' {
+		return int(char-'A'+10) < radix
+	}
+
+	return false
 }

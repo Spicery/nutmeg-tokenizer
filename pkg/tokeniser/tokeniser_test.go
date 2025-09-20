@@ -3,6 +3,7 @@ package tokeniser
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -118,7 +119,6 @@ func TestNumericTokens(t *testing.T) {
 		{"8r77", 8, "77", "", ""},
 		{"16rFF", 16, "FF", "", ""},
 		{"36rHELLO", 36, "HELLO", "", ""},
-		{"10rAB", 10, "AB", "", ""},
 		{"16rDEADBEEF", 16, "DEADBEEF", "", ""},
 		{"36rZEBRA", 36, "ZEBRA", "", ""},
 
@@ -143,8 +143,6 @@ func TestNumericTokens(t *testing.T) {
 		// Edge cases for radix values
 		{"2r101", 2, "101", "", ""}, // minimum radix
 		{"36rZ", 36, "Z", "", ""},   // maximum radix
-		{"9rAB", 9, "AB", "", ""},   // single digit radix
-		{"35rYZ", 35, "YZ", "", ""}, // near maximum radix
 		{"12rAB", 12, "AB", "", ""}, // double digit radix
 
 		// Complex cases
@@ -845,6 +843,89 @@ prefix:
 
 	if len(rules.Prefix) != 1 || rules.Prefix[0].Text != "custom_return" {
 		t.Errorf("Expected prefix rule with text 'custom_return', got %+v", rules.Prefix)
+	}
+}
+
+// TestExceptionTokens tests that invalid numeric literals produce exception tokens.
+func TestExceptionTokens(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		expectedError string
+	}{
+		{
+			name:          "Invalid base 10 digits",
+			input:         "10rAB",
+			expectedError: "invalid literal",
+		},
+		{
+			name:          "Invalid base 9 digits",
+			input:         "9rAB",
+			expectedError: "invalid literal",
+		},
+		{
+			name:          "Invalid base 35 digits",
+			input:         "35rYZ",
+			expectedError: "invalid literal",
+		},
+		{
+			name:          "Invalid binary digits",
+			input:         "2r123",
+			expectedError: "invalid literal",
+		},
+		{
+			name:          "Invalid octal digits",
+			input:         "8r89",
+			expectedError: "invalid literal",
+		},
+		{
+			name:          "Invalid hex prefix digits",
+			input:         "0xGHI",
+			expectedError: "invalid literal",
+		},
+		{
+			name:          "Invalid fraction digits",
+			input:         "8r12.89",
+			expectedError: "invalid literal",
+		},
+		{
+			name:          "Invalid balanced ternary wrong radix",
+			input:         "4t0T1",
+			expectedError: "invalid literal",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokeniser := New(tt.input)
+			tokens, err := tokeniser.Tokenise()
+
+			// Should get an error
+			if err == nil {
+				t.Errorf("Expected an error, but got none")
+				return
+			}
+
+			// Check error message contains expected text
+			if !strings.Contains(err.Error(), tt.expectedError) {
+				t.Errorf("Expected error to contain '%s', got '%s'", tt.expectedError, err.Error())
+			}
+
+			// Should still have one token (the exception token)
+			if len(tokens) != 1 {
+				t.Errorf("Expected 1 token (exception), got %d", len(tokens))
+				return
+			}
+
+			token := tokens[0]
+			if token.Type != ExceptionToken {
+				t.Errorf("Expected exception token, got %s", token.Type)
+			}
+
+			if token.Reason == nil || !strings.Contains(*token.Reason, tt.expectedError) {
+				t.Errorf("Expected reason to contain '%s', got %v", tt.expectedError, token.Reason)
+			}
+		})
 	}
 }
 

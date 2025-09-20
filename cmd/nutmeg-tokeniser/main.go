@@ -23,6 +23,7 @@ Options:
   --input <file>        Input file (defaults to stdin)
   --output <file>       Output file (defaults to stdout)
   --rules <file>        YAML rules file for custom tokenisation rules (optional)
+  --exit0               Exit with code 0 even on tokenisation errors (suppress stderr)
 
 Examples:
   nutmeg-tokeniser                                    # Read from stdin, write to stdout
@@ -38,13 +39,14 @@ See docs/rules_file.md for information about custom rules files.
 )
 
 func main() {
-	var showHelp, showVersion bool
+	var showHelp, showVersion, exit0 bool
 	var inputFile, outputFile, rulesFile string
 
 	flag.BoolVar(&showHelp, "h", false, "Show help")
 	flag.BoolVar(&showHelp, "help", false, "Show help")
 	flag.BoolVar(&showVersion, "v", false, "Show version")
 	flag.BoolVar(&showVersion, "version", false, "Show version")
+	flag.BoolVar(&exit0, "exit0", false, "Exit with code 0 even on errors")
 	flag.StringVar(&inputFile, "input", "", "Input file (defaults to stdin)")
 	flag.StringVar(&outputFile, "output", "", "Output file (defaults to stdout)")
 	flag.StringVar(&rulesFile, "rules", "", "YAML rules file (optional)")
@@ -112,11 +114,7 @@ func main() {
 	}
 
 	// Process input
-	tokens, err := t.Tokenise()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Tokenisation error: %v\n", err)
-		os.Exit(1)
-	}
+	tokens, tokeniseErr := t.Tokenise()
 
 	// Prepare output destination
 	var output io.Writer
@@ -136,7 +134,7 @@ func main() {
 		outputCloser = file
 	}
 
-	// Output tokens as JSON, one per line
+	// Output tokens as JSON, one per line (even if there was an error)
 	for _, token := range tokens {
 		jsonBytes, err := json.Marshal(token)
 		if err != nil {
@@ -150,6 +148,18 @@ func main() {
 	if outputCloser != nil {
 		if err := outputCloser.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error closing output file '%s': %v\n", outputFile, err)
+			os.Exit(1)
+		}
+	}
+
+	// Handle tokenisation error after outputting tokens
+	if tokeniseErr != nil {
+		if exit0 {
+			// With --exit0, exit normally despite error
+			os.Exit(0)
+		} else {
+			// Without --exit0, print error to stderr and exit with error code
+			fmt.Fprintf(os.Stderr, "Tokenisation error: %v\n", tokeniseErr)
 			os.Exit(1)
 		}
 	}
