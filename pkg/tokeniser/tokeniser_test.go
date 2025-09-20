@@ -408,6 +408,103 @@ func TestNumericWithUnderscores(t *testing.T) {
 	}
 }
 
+func TestBalancedTernaryTokens(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            string
+		expectedRadix    int
+		expectedMantissa string
+		expectedFraction string
+		expectedExponent string
+		expectedBalanced bool
+	}{
+		// Basic balanced ternary integers
+		{"Simple balanced ternary", "0t10", 3, "10", "", "", true},
+		{"Negative balanced ternary", "0tT1", 3, "T1", "", "", true},
+		{"Complex balanced ternary", "0t1T0", 3, "1T0", "", "", true},
+		{"All zeros", "0t000", 3, "000", "", "", true},
+		{"All ones", "0t111", 3, "111", "", "", true},
+		{"All T (negative)", "0tTTT", 3, "TTT", "", "", true},
+		
+		// Balanced ternary with fractions
+		{"Mixed integer and fraction", "0t1.T", 3, "1", "T", "", true},
+		{"Complex fraction", "0tT.01", 3, "T", "01", "", true},
+		{"Long fraction", "0t10.1T0", 3, "10", "1T0", "", true},
+		
+		// Balanced ternary with scientific notation
+		{"Balanced ternary with exponent", "0tTTe-2", 3, "TT", "", "-2", true},
+		{"Integer with positive exponent", "0t10e+3", 3, "10", "", "+3", true},
+		{"Fraction with exponent", "0t1.Te5", 3, "1", "T", "5", true},
+		{"Complex with exponent", "0t1T0.01e-4", 3, "1T0", "01", "-4", true},
+		
+		// Balanced ternary with underscores
+		{"Underscores in mantissa", "0t1_0_T", 3, "10T", "", "", true},
+		{"Underscores in fraction", "0t10.1_T_0", 3, "10", "1T0", "", true},
+		{"Underscores in both", "0t1_T.0_1", 3, "1T", "01", "", true},
+		{"Complex with underscores", "0t1_T_0.T_0_1e+2", 3, "1T0", "T01", "+2", true},
+		
+		// Edge cases
+		{"Single digit zero", "0t0", 3, "0", "", "", true},
+		{"Single digit one", "0t1", 3, "1", "", "", true},
+		{"Single digit T", "0tT", 3, "T", "", "", true},
+		{"Multiple underscores", "0t1_1_1_T_T_T", 3, "111TTT", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokeniser := New(tt.input)
+			tokens, err := tokeniser.Tokenise()
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(tokens) != 1 {
+				t.Errorf("Expected 1 token, got %d", len(tokens))
+				return
+			}
+
+			token := tokens[0]
+			if token.Type != NumericLiteral {
+				t.Errorf("Expected numeric token, got %s", token.Type)
+			}
+
+			if token.Radix == nil || *token.Radix != tt.expectedRadix {
+				t.Errorf("Expected radix %d, got %v", tt.expectedRadix, token.Radix)
+			}
+
+			if token.Mantissa == nil || *token.Mantissa != tt.expectedMantissa {
+				t.Errorf("Expected mantissa '%s', got %v", tt.expectedMantissa, token.Mantissa)
+			}
+
+			if tt.expectedFraction == "" {
+				if token.Fraction != nil {
+					t.Errorf("Expected no fraction, got '%s'", *token.Fraction)
+				}
+			} else {
+				if token.Fraction == nil || *token.Fraction != tt.expectedFraction {
+					t.Errorf("Expected fraction '%s', got %v", tt.expectedFraction, token.Fraction)
+				}
+			}
+
+			if tt.expectedExponent == "" {
+				if token.Exponent != nil {
+					t.Errorf("Expected no exponent, got '%s'", *token.Exponent)
+				}
+			} else {
+				if token.Exponent == nil || *token.Exponent != tt.expectedExponent {
+					t.Errorf("Expected exponent '%s', got %v", tt.expectedExponent, token.Exponent)
+				}
+			}
+
+			if token.Balanced == nil || *token.Balanced != tt.expectedBalanced {
+				t.Errorf("Expected balanced %t, got %v", tt.expectedBalanced, token.Balanced)
+			}
+		})
+	}
+}
+
 func TestStartTokens(t *testing.T) {
 	tests := []struct {
 		input        string

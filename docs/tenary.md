@@ -10,6 +10,8 @@ sign.
 - This is introduced with the prefix 0t and uses the digits 0, 1 and T. 
 - In this notation T stands for -1 and the radix remains 3 as expected. 
 - Like other numeric literals it supports both floating point and exponents.
+- And like other numeric literals it supports underscores in the mantissa and
+  fraction parts (only).
 
 ## Representation as a token
 

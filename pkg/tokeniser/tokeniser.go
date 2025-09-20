@@ -23,7 +23,7 @@ var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
 	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
-	numericRegex    = regexp.MustCompile(`^(?:0x[0-9A-F]+(?:_[0-9A-F]+)*|0b[01]+(?:_[01]+)*|0o[0-7]+(?:_[0-7]+)*|(?:[2-9]|[12]\d|3[0-6])r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z]*(?:_[0-9A-Z]+)*)?(?:e[+-]?\d+)?`)
+	numericRegex    = regexp.MustCompile(`^(?:0x[0-9A-F]+(?:_[0-9A-F]+)*|0b[01]+(?:_[01]+)*|0o[0-7]+(?:_[0-7]+)*|0t[01T]+(?:_[01T]+)*|(?:[2-9]|[12]\d|3[0-6])r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z01T]*(?:_[0-9A-Z01T]+)*)?(?:e[+-]?\d+)?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
 )
 
@@ -504,6 +504,37 @@ func (t *Tokeniser) matchNumeric() *Token {
 	} else if strings.HasPrefix(match, "0x") {
 		radix = 16
 		mantissa = match[2:]
+	} else if strings.HasPrefix(match, "0t") {
+		// Handle balanced ternary (e.g., 0t10T, 0tT1.0)
+		radix = 3
+		mantissa = match[2:]
+		
+		// Extract decimal point and fraction for balanced ternary
+		if dotIndex := strings.Index(mantissa, "."); dotIndex != -1 {
+			fraction = mantissa[dotIndex+1:]
+			mantissa = mantissa[:dotIndex]
+
+			// Remove exponent from fraction if present
+			if eIndex := strings.Index(fraction, "e"); eIndex != -1 {
+				exponent = fraction[eIndex+1:]
+				fraction = fraction[:eIndex]
+			}
+		} else if eIndex := strings.Index(mantissa, "e"); eIndex != -1 {
+			exponent = mantissa[eIndex+1:]
+			mantissa = mantissa[:eIndex]
+		}
+
+		// Remove underscores from mantissa and fraction
+		mantissa = strings.ReplaceAll(mantissa, "_", "")
+		if fraction != "" {
+			fraction = strings.ReplaceAll(fraction, "_", "")
+		}
+
+		end := Position{Line: t.line, Col: t.column + len(match)}
+		span := Span{End: end}
+
+		t.advance(len(match))
+		return NewBalancedTernaryToken(match, mantissa, fraction, exponent, span)
 	} else if rIndex := strings.Index(match, "r"); rIndex != -1 {
 		// Handle rR notation (e.g., 2r1010, 16rFF, 36rHELLO)
 		radixStr := match[:rIndex]
