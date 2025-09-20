@@ -18,6 +18,15 @@ It is also possible to write these in other bases apart from base 10.
 - It is possible to write floating point numbers in these non-decimal bases.
   - For example 0x1.1e2 = 272.0.
 - Important: note that both the radix part and the exponent part are written in decimal notation.
+- Important: note that the radix-marking character (x, o, b, r) must be lower
+  case; the letters acting as digits are upper-case; the exponent marker (e)
+  must be lower case. This is needed to cleanly separate the markers from the
+  digits.
+
+## Underscores
+
+Nutmeg uses a very similar rule to Python: underscores may be used between 
+any two characters of the mantissa or any two characters of the fraction.
 
 ### Represetation as a token
 
