@@ -501,12 +501,12 @@ func (t *Tokeniser) matchNumeric() *Token {
 	if radixMatch := radixRegex.FindStringSubmatch(t.input[t.position:]); radixMatch != nil {
 		return t.parseRadixNumber(radixMatch)
 	}
-	
+
 	// Then try to match decimal numbers
 	if decimalMatch := decimalRegex.FindStringSubmatch(t.input[t.position:]); decimalMatch != nil {
 		return t.parseDecimalNumber(decimalMatch)
 	}
-	
+
 	return nil
 }
 
@@ -517,19 +517,19 @@ func (t *Tokeniser) parseRadixNumber(match []string) *Token {
 	mantissa := match[2]
 	fraction := ""
 	exponent := ""
-	
+
 	if len(match) > 3 && match[3] != "" {
 		fraction = match[3][1:] // Remove the leading dot
 	}
 	if len(match) > 4 && match[4] != "" {
 		exponent = match[4] // Already without the 'e'
 	}
-	
+
 	// Extract radix prefix and determine base
 	lastChar := radixPart[len(radixPart)-1]
 	radixPrefix := ""
-	base := 10
-	
+	var base int
+
 	switch lastChar {
 	case 'x':
 		if radixPart == "0x" {
@@ -562,11 +562,11 @@ func (t *Tokeniser) parseRadixNumber(match []string) *Token {
 			if fraction != "" {
 				fraction = strings.ReplaceAll(fraction, "_", "")
 			}
-			
+
 			end := Position{Line: t.line, Col: t.column + len(fullMatch)}
 			span := Span{End: end}
 			t.advance(len(fullMatch))
-			
+
 			return NewBalancedTernaryToken(fullMatch, mantissa, fraction, exponent, span)
 		} else {
 			// Invalid ternary format - should be 0t
@@ -576,7 +576,7 @@ func (t *Tokeniser) parseRadixNumber(match []string) *Token {
 		// Parse the radix number (e.g., "2r", "16r", "36r")
 		radixStr := radixPart[:len(radixPart)-1]
 		radixPrefix = radixPart
-		
+
 		parsedRadix := 0
 		for _, digit := range radixStr {
 			if digit >= '0' && digit <= '9' {
@@ -585,26 +585,26 @@ func (t *Tokeniser) parseRadixNumber(match []string) *Token {
 				return t.createExceptionToken(fullMatch, "invalid literal")
 			}
 		}
-		
+
 		if parsedRadix < 2 || parsedRadix > 36 {
 			return t.createExceptionToken(fullMatch, "invalid literal")
 		}
-		
+
 		base = parsedRadix
 	default:
 		return t.createExceptionToken(fullMatch, "invalid literal")
 	}
-	
+
 	// Remove underscores from mantissa and fraction
 	mantissa = strings.ReplaceAll(mantissa, "_", "")
 	if fraction != "" {
 		fraction = strings.ReplaceAll(fraction, "_", "")
 	}
-	
+
 	end := Position{Line: t.line, Col: t.column + len(fullMatch)}
 	span := Span{End: end}
 	t.advance(len(fullMatch))
-	
+
 	return NewNumericToken(fullMatch, radixPrefix, base, mantissa, fraction, exponent, span)
 }
 
@@ -614,24 +614,24 @@ func (t *Tokeniser) parseDecimalNumber(match []string) *Token {
 	mantissa := match[1]
 	fraction := ""
 	exponent := ""
-	
+
 	if len(match) > 2 && match[2] != "" {
 		fraction = match[2][1:] // Remove the leading dot
 	}
 	if len(match) > 3 && match[3] != "" {
 		exponent = match[3] // Already without the 'e'
 	}
-	
+
 	// Remove underscores from mantissa and fraction
 	mantissa = strings.ReplaceAll(mantissa, "_", "")
 	if fraction != "" {
 		fraction = strings.ReplaceAll(fraction, "_", "")
 	}
-	
+
 	end := Position{Line: t.line, Col: t.column + len(fullMatch)}
 	span := Span{End: end}
 	t.advance(len(fullMatch))
-	
+
 	return NewNumericToken(fullMatch, "", 10, mantissa, fraction, exponent, span)
 }
 

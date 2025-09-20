@@ -4,7 +4,7 @@ default:
 test: unittest lint fmt-check tidy build
 
 unittest:
-    go test -v ./...
+    go test ./...
 
 lint:
     echo "Running linter..."
