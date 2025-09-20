@@ -501,6 +501,7 @@ func (t *Tokeniser) matchNumeric() *Token {
 	}
 
 	radix := 10
+	radixPrefix := ""
 	mantissa := match
 	var fraction, exponent string
 
@@ -508,38 +509,24 @@ func (t *Tokeniser) matchNumeric() *Token {
 	if strings.Contains(match, "x") {
 		// Handle hex notation (0x prefix required)
 		xIndex := strings.Index(match, "x")
-		prefix := match[:xIndex]
-		if prefix != "0" {
-			// Invalid - only 0x is allowed, but we'll parse it and let validation catch it
-		}
 		radix = 16
+		radixPrefix = "0x"
 		mantissa = match[xIndex+1:]
 	} else if strings.Contains(match, "o") {
 		// Handle octal notation (0o prefix required)
 		oIndex := strings.Index(match, "o")
-		prefix := match[:oIndex]
-		if prefix != "0" {
-			// Invalid - only 0o is allowed, but we'll parse it and let validation catch it
-		}
 		radix = 8
+		radixPrefix = "0o"
 		mantissa = match[oIndex+1:]
 	} else if strings.Contains(match, "b") {
 		// Handle binary notation (0b prefix required)
 		bIndex := strings.Index(match, "b")
-		prefix := match[:bIndex]
-		if prefix != "0" {
-			// Invalid - only 0b is allowed, but we'll parse it and let validation catch it
-		}
 		radix = 2
+		radixPrefix = "0b"
 		mantissa = match[bIndex+1:]
 	} else if strings.Contains(match, "t") {
 		// Handle balanced ternary notation (0t prefix required)
 		tIndex := strings.Index(match, "t")
-		prefix := match[:tIndex]
-		if prefix != "0" {
-			// Invalid - only 0t is allowed, but we'll parse it and let validation catch it
-		}
-		radix = 3
 		mantissa = match[tIndex+1:]
 
 		// Extract decimal point and fraction for balanced ternary
@@ -569,32 +556,11 @@ func (t *Tokeniser) matchNumeric() *Token {
 		t.advance(len(match))
 
 		// Create balanced ternary token
-		balanced := true
-		return &Token{
-			Text:     match,
-			Type:     NumericLiteral,
-			Span:     span,
-			Radix:    &radix,
-			Mantissa: &mantissa,
-			Fraction: func() *string {
-				if fraction != "" {
-					return &fraction
-				} else {
-					return nil
-				}
-			}(),
-			Exponent: func() *string {
-				if exponent != "" {
-					return &exponent
-				} else {
-					return nil
-				}
-			}(),
-			Balanced: &balanced,
-		}
+		return NewBalancedTernaryToken(match, mantissa, fraction, exponent, span)
 	} else if rIndex := strings.Index(match, "r"); rIndex != -1 {
 		// Handle rR notation (e.g., 2r1010, 16rFF, 36rHELLO)
 		radixStr := match[:rIndex]
+		radixPrefix = radixStr + "r"
 		mantissa = match[rIndex+1:]
 
 		// Parse radix from string
@@ -606,6 +572,7 @@ func (t *Tokeniser) matchNumeric() *Token {
 				} else {
 					// Invalid radix, treat as decimal
 					radix = 10
+					radixPrefix = ""
 					mantissa = match
 					goto extractFraction
 				}
@@ -615,6 +582,7 @@ func (t *Tokeniser) matchNumeric() *Token {
 			} else {
 				// Invalid radix range, treat as decimal
 				radix = 10
+				radixPrefix = ""
 				mantissa = match
 			}
 		}
@@ -647,7 +615,7 @@ extractFraction:
 	span := Span{End: end}
 
 	t.advance(len(match))
-	return NewNumericToken(match, radix, mantissa, fraction, exponent, span)
+	return NewNumericToken(match, radixPrefix, radix, mantissa, fraction, exponent, span)
 }
 
 // matchIdentifier attempts to match an identifier.

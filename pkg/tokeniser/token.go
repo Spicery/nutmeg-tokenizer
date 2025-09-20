@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// TokenType represents the different types of tokens in the Nutmeg language.
+// TokenType represents the different types of tokens.
 type TokenType string
 
 const (
@@ -69,7 +69,8 @@ type Token struct {
 	Value *string `json:"value,omitempty"`
 
 	// Numeric token fields
-	Radix    *int    `json:"radix,omitempty"`
+	Radix    *string `json:"radix,omitempty"` // Textual radix prefix (e.g., "0x", "2r", "0t", "" for decimal)
+	Base     *int    `json:"base,omitempty"`  // Numeric base (e.g., 16, 2, 3, 10)
 	Mantissa *string `json:"mantissa,omitempty"`
 	Fraction *string `json:"fraction,omitempty"`
 	Exponent *string `json:"exponent,omitempty"`
@@ -111,12 +112,13 @@ func NewStringToken(text, value string, span Span) *Token {
 }
 
 // NewNumericToken creates a new numeric token with radix and components.
-func NewNumericToken(text string, radix int, mantissa, fraction, exponent string, span Span) *Token {
+func NewNumericToken(text string, radix string, base int, mantissa, fraction, exponent string, span Span) *Token {
 	token := &Token{
 		Text:     text,
 		Type:     NumericLiteral,
 		Span:     span,
 		Radix:    &radix,
+		Base:     &base,
 		Mantissa: &mantissa,
 	}
 
@@ -132,13 +134,15 @@ func NewNumericToken(text string, radix int, mantissa, fraction, exponent string
 
 // NewBalancedTernaryToken creates a new balanced ternary numeric token.
 func NewBalancedTernaryToken(text string, mantissa, fraction, exponent string, span Span) *Token {
-	radix := 3
+	radixPrefix := "0t"
+	base := 3
 	balanced := true
 	token := &Token{
 		Text:     text,
 		Type:     NumericLiteral,
 		Span:     span,
-		Radix:    &radix,
+		Radix:    &radixPrefix,
+		Base:     &base,
 		Mantissa: &mantissa,
 		Balanced: &balanced,
 	}
@@ -277,11 +281,11 @@ func (t *Token) isValidNumber() (bool, string) {
 		return true, "" // Non-numeric tokens are always valid
 	}
 
-	if t.Radix == nil || t.Mantissa == nil {
-		return false, "missing radix or mantissa"
+	if t.Base == nil || t.Mantissa == nil {
+		return false, "missing base or mantissa"
 	}
 
-	radix := *t.Radix
+	base := *t.Base
 	mantissa := *t.Mantissa
 	isBalanced := t.Balanced != nil && *t.Balanced
 
@@ -307,13 +311,13 @@ func (t *Token) isValidNumber() (bool, string) {
 	}
 
 	// Validate mantissa digits
-	if !isValidDigitsForRadix(mantissa, radix, isBalanced) {
+	if !isValidDigitsForRadix(mantissa, base, isBalanced) {
 		return false, "invalid literal"
 	}
 
 	// Validate fraction digits if present
 	if t.Fraction != nil && *t.Fraction != "" {
-		if !isValidDigitsForRadix(*t.Fraction, radix, isBalanced) {
+		if !isValidDigitsForRadix(*t.Fraction, base, isBalanced) {
 			return false, "invalid literal"
 		}
 	}

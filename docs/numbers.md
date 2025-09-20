@@ -34,7 +34,8 @@ may not appear anywhere else in a number.
 To assist the parser, which is the next stage in the compilation pipeline, we 
 split the token up into:
 
-- decimalradix, the radix in decimal notation (int n, 2 <= n <= 36)
+- radix, the part of the number before the mantissa (e.g. `0xEF` the radix is "0x", `197` the radix is "", `0t10T` the radix is "0t")
+- base, the base that the number uses(e.g. `0xEF` the base is 16, `197` the base is 10, `0t10T` the base is 3)
 - mantissa, the digits (or upper case letters) before the decimal point, excluding underscores
 - fraction, the digits (or upper case letters) after the decimal point, excluding underscores
 - exponent, the radix in decimal notation (int)

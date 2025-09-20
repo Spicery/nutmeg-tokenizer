@@ -92,63 +92,64 @@ func TestStringTokens(t *testing.T) {
 func TestNumericTokens(t *testing.T) {
 	tests := []struct {
 		input            string
-		expectedRadix    int
+		expectedRadix    string
+		expectedBase     int
 		expectedMantissa string
 		expectedFraction string
 		expectedExponent string
 	}{
 		// Existing decimal tests
-		{"42", 10, "42", "", ""},
-		{"3.14", 10, "3", "14", ""},
-		{"1.5e10", 10, "1", "5", "10"},
-		{"2e-3", 10, "2", "", "-3"},
+		{"42", "", 10, "42", "", ""},
+		{"3.14", "", 10, "3", "14", ""},
+		{"1.5e10", "", 10, "1", "5", "10"},
+		{"2e-3", "", 10, "2", "", "-3"},
 
 		// Traditional prefix tests
-		{"0x2A", 16, "2A", "", ""},
-		{"0xFF", 16, "FF", "", ""},
-		{"0x1A", 16, "1A", "", ""},
-		{"0b101010", 2, "101010", "", ""},
-		{"0b1010", 2, "1010", "", ""},
-		{"0b11", 2, "11", "", ""},
-		{"0o52", 8, "52", "", ""},
-		{"0o127", 8, "127", "", ""},
-		{"0o777", 8, "777", "", ""},
+		{"0x2A", "0x", 16, "2A", "", ""},
+		{"0xFF", "0x", 16, "FF", "", ""},
+		{"0x1A", "0x", 16, "1A", "", ""},
+		{"0b101010", "0b", 2, "101010", "", ""},
+		{"0b1010", "0b", 2, "1010", "", ""},
+		{"0b11", "0b", 2, "11", "", ""},
+		{"0o52", "0o", 8, "52", "", ""},
+		{"0o127", "0o", 8, "127", "", ""},
+		{"0o777", "0o", 8, "777", "", ""},
 
 		// New rR notation tests - basic
-		{"2r1010", 2, "1010", "", ""},
-		{"8r77", 8, "77", "", ""},
-		{"16rFF", 16, "FF", "", ""},
-		{"36rHELLO", 36, "HELLO", "", ""},
-		{"16rDEADBEEF", 16, "DEADBEEF", "", ""},
-		{"36rZEBRA", 36, "ZEBRA", "", ""},
+		{"2r1010", "2r", 2, "1010", "", ""},
+		{"8r77", "8r", 8, "77", "", ""},
+		{"16rFF", "16r", 16, "FF", "", ""},
+		{"36rHELLO", "36r", 36, "HELLO", "", ""},
+		{"16rDEADBEEF", "16r", 16, "DEADBEEF", "", ""},
+		{"36rZEBRA", "36r", 36, "ZEBRA", "", ""},
 
 		// rR notation with floating point
-		{"2r1010.11", 2, "1010", "11", ""},
-		{"16rFF.A", 16, "FF", "A", ""},
-		{"36rHELLO.WORLD", 36, "HELLO", "WORLD", ""},
-		{"8r123.456", 8, "123", "456", ""},
-		{"16r1A.BC", 16, "1A", "BC", ""},
+		{"2r1010.11", "2r", 2, "1010", "11", ""},
+		{"16rFF.A", "16r", 16, "FF", "A", ""},
+		{"36rHELLO.WORLD", "36r", 36, "HELLO", "WORLD", ""},
+		{"8r123.456", "8r", 8, "123", "456", ""},
+		{"16r1A.BC", "16r", 16, "1A", "BC", ""},
 
 		// rR notation with scientific notation
-		{"10r123e5", 10, "123", "", "5"},
-		{"16rABe-2", 16, "AB", "", "-2"},
-		{"2r101e+3", 2, "101", "", "+3"},
-		{"8r777e10", 8, "777", "", "10"},
+		{"10r123e5", "10r", 10, "123", "", "5"},
+		{"16rABe-2", "16r", 16, "AB", "", "-2"},
+		{"2r101e+3", "2r", 2, "101", "", "+3"},
+		{"8r777e10", "8r", 8, "777", "", "10"},
 
 		// rR notation with both fraction and exponent
-		{"10r12.34e5", 10, "12", "34", "5"},
-		{"16rAB.CDe-2", 16, "AB", "CD", "-2"},
-		{"2r10.11e+3", 2, "10", "11", "+3"},
+		{"10r12.34e5", "10r", 10, "12", "34", "5"},
+		{"16rAB.CDe-2", "16r", 16, "AB", "CD", "-2"},
+		{"2r10.11e+3", "2r", 2, "10", "11", "+3"},
 
 		// Edge cases for radix values
-		{"2r101", 2, "101", "", ""}, // minimum radix
-		{"36rZ", 36, "Z", "", ""},   // maximum radix
-		{"12rAB", 12, "AB", "", ""}, // double digit radix
+		{"2r101", "2r", 2, "101", "", ""},  // minimum radix
+		{"36rZ", "36r", 36, "Z", "", ""},   // maximum radix
+		{"12rAB", "12r", 12, "AB", "", ""}, // double digit radix
 
 		// Complex cases
-		{"16rDEAD.BEEFe10", 16, "DEAD", "BEEF", "10"},
-		{"36rHELLO.WORLDe-5", 36, "HELLO", "WORLD", "-5"},
-		{"8r123.456e+7", 8, "123", "456", "+7"},
+		{"16rDEAD.BEEFe10", "16r", 16, "DEAD", "BEEF", "10"},
+		{"36rHELLO.WORLDe-5", "36r", 36, "HELLO", "WORLD", "-5"},
+		{"8r123.456e+7", "8r", 8, "123", "456", "+7"},
 	}
 
 	for _, tt := range tests {
@@ -172,7 +173,11 @@ func TestNumericTokens(t *testing.T) {
 			}
 
 			if token.Radix == nil || *token.Radix != tt.expectedRadix {
-				t.Errorf("Expected radix %d, got %v", tt.expectedRadix, token.Radix)
+				t.Errorf("Expected radix '%s', got %v", tt.expectedRadix, token.Radix)
+			}
+
+			if token.Base == nil || *token.Base != tt.expectedBase {
+				t.Errorf("Expected base %d, got %v", tt.expectedBase, token.Base)
 			}
 
 			if token.Mantissa == nil || *token.Mantissa != tt.expectedMantissa {
@@ -207,54 +212,55 @@ func TestEnhancedNumericEdgeCases(t *testing.T) {
 		name             string
 		input            string
 		expectedTokens   int
-		expectedRadix    int
+		expectedRadix    string
+		expectedBase     int
 		expectedMantissa string
 		expectedFraction string
 		expectedExponent string
 	}{
 		// Test proper case sensitivity - only uppercase digits allowed
-		{"Lowercase e exponent", "10r123e5", 1, 10, "123", "", "5"},
+		{"Lowercase e exponent", "10r123e5", 1, "10r", 10, "123", "", "5"},
 
 		// Test boundary radix values
-		{"Minimum radix", "2r1", 1, 2, "1", "", ""},
-		{"Maximum radix", "36rZ", 1, 36, "Z", "", ""},
-		{"Near maximum radix", "35rY", 1, 35, "Y", "", ""},
+		{"Minimum radix", "2r1", 1, "2r", 2, "1", "", ""},
+		{"Maximum radix", "36rZ", 1, "36r", 36, "Z", "", ""},
+		{"Near maximum radix", "35rY", 1, "35r", 35, "Y", "", ""},
 
 		// Test multi-digit radix values
-		{"Double digit radix 10", "10r9", 1, 10, "9", "", ""},
-		{"Double digit radix 16", "16rF", 1, 16, "F", "", ""},
-		{"Double digit radix 36", "36rZ", 1, 36, "Z", "", ""},
+		{"Double digit radix 10", "10r9", 1, "10r", 10, "9", "", ""},
+		{"Double digit radix 16", "16rF", 1, "16r", 16, "F", "", ""},
+		{"Double digit radix 36", "36rZ", 1, "36r", 36, "Z", "", ""},
 
 		// Test comprehensive digit ranges for different bases
-		{"Base 2 max digits", "2r1", 1, 2, "1", "", ""},
-		{"Base 8 max digits", "8r7", 1, 8, "7", "", ""},
-		{"Base 10 max digits", "10r9", 1, 10, "9", "", ""},
-		{"Base 16 max digits", "16rF", 1, 16, "F", "", ""},
-		{"Base 36 max digits", "36rZ", 1, 36, "Z", "", ""},
+		{"Base 2 max digits", "2r1", 1, "2r", 2, "1", "", ""},
+		{"Base 8 max digits", "8r7", 1, "8r", 8, "7", "", ""},
+		{"Base 10 max digits", "10r9", 1, "10r", 10, "9", "", ""},
+		{"Base 16 max digits", "16rF", 1, "16r", 16, "F", "", ""},
+		{"Base 36 max digits", "36rZ", 1, "36r", 36, "Z", "", ""},
 
 		// Test floating point in various bases
-		{"Binary floating point", "2r1.1", 1, 2, "1", "1", ""},
-		{"Octal floating point", "8r7.6", 1, 8, "7", "6", ""},
-		{"Hex floating point", "16rF.E", 1, 16, "F", "E", ""},
-		{"Base 36 floating point", "36rZ.Y", 1, 36, "Z", "Y", ""},
+		{"Binary floating point", "2r1.1", 1, "2r", 2, "1", "1", ""},
+		{"Octal floating point", "8r7.6", 1, "8r", 8, "7", "6", ""},
+		{"Hex floating point", "16rF.E", 1, "16r", 16, "F", "E", ""},
+		{"Base 36 floating point", "36rZ.Y", 1, "36r", 36, "Z", "Y", ""},
 
 		// Test scientific notation in various bases
-		{"Binary scientific", "2r1e2", 1, 2, "1", "", "2"},
-		{"Hex scientific", "16rFe10", 1, 16, "F", "", "10"},
-		{"Base 36 scientific", "36rZe5", 1, 36, "Z", "", "5"},
+		{"Binary scientific", "2r1e2", 1, "2r", 2, "1", "", "2"},
+		{"Hex scientific", "16rFe10", 1, "16r", 16, "F", "", "10"},
+		{"Base 36 scientific", "36rZe5", 1, "36r", 36, "Z", "", "5"},
 
 		// Test combined floating point and scientific notation
-		{"Hex float scientific", "16rA.Be-2", 1, 16, "A", "B", "-2"},
-		{"Base 36 float scientific", "36rH.ELLOe+10", 1, 36, "H", "ELLO", "+10"},
+		{"Hex float scientific", "16rA.Be-2", 1, "16r", 16, "A", "B", "-2"},
+		{"Base 36 float scientific", "36rH.ELLOe+10", 1, "36r", 36, "H", "ELLO", "+10"},
 
 		// Test complex realistic examples
-		{"Hex color value", "16rFFFFFF", 1, 16, "FFFFFF", "", ""},
-		{"Base 36 word", "36rHELLOWORLD", 1, 36, "HELLOWORLD", "", ""},
-		{"Large hex number", "16rDEADBEEF", 1, 16, "DEADBEEF", "", ""},
+		{"Hex color value", "16rFFFFFF", 1, "16r", 16, "FFFFFF", "", ""},
+		{"Base 36 word", "36rHELLOWORLD", 1, "36r", 36, "HELLOWORLD", "", ""},
+		{"Large hex number", "16rDEADBEEF", 1, "16r", 16, "DEADBEEF", "", ""},
 
 		// Test edge cases with scientific notation avoiding lowercase conflicts
-		{"Hex with exponent", "16rABCe5", 1, 16, "ABC", "", "5"},
-		{"Base 36 avoiding E digit", "36rHELLe10", 1, 36, "HELL", "", "10"},
+		{"Hex with exponent", "16rABCe5", 1, "16r", 16, "ABC", "", "5"},
+		{"Base 36 avoiding E digit", "36rHELLe10", 1, "36r", 36, "HELL", "", "10"},
 	}
 
 	for _, tt := range tests {
@@ -283,7 +289,11 @@ func TestEnhancedNumericEdgeCases(t *testing.T) {
 			}
 
 			if token.Radix == nil || *token.Radix != tt.expectedRadix {
-				t.Errorf("Expected radix %d, got %v", tt.expectedRadix, token.Radix)
+				t.Errorf("Expected radix '%s', got %v", tt.expectedRadix, token.Radix)
+			}
+
+			if token.Base == nil || *token.Base != tt.expectedBase {
+				t.Errorf("Expected base %d, got %v", tt.expectedBase, token.Base)
 			}
 
 			if token.Mantissa == nil || *token.Mantissa != tt.expectedMantissa {
@@ -317,42 +327,43 @@ func TestNumericWithUnderscores(t *testing.T) {
 	tests := []struct {
 		name             string
 		input            string
-		expectedRadix    int
+		expectedRadix    string
+		expectedBase     int
 		expectedMantissa string
 		expectedFraction string
 		expectedExponent string
 	}{
 		// Decimal numbers with underscores
-		{"Decimal with underscores", "1_234_567", 10, "1234567", "", ""},
-		{"Decimal float with underscores", "3_14.15_92", 10, "314", "1592", ""},
-		{"Decimal scientific with underscores", "1_23e45", 10, "123", "", "45"},
-		{"Decimal float scientific with underscores", "1_23.45_67e89", 10, "123", "4567", "89"},
+		{"Decimal with underscores", "1_234_567", "", 10, "1234567", "", ""},
+		{"Decimal float with underscores", "3_14.15_92", "", 10, "314", "1592", ""},
+		{"Decimal scientific with underscores", "1_23e45", "", 10, "123", "", "45"},
+		{"Decimal float scientific with underscores", "1_23.45_67e89", "", 10, "123", "4567", "89"},
 
 		// Binary with underscores
-		{"Binary with underscores", "0b1010_1100", 2, "10101100", "", ""},
-		{"Binary float with underscores", "0b10_10.11_01", 2, "1010", "1101", ""},
+		{"Binary with underscores", "0b1010_1100", "0b", 2, "10101100", "", ""},
+		{"Binary float with underscores", "0b10_10.11_01", "0b", 2, "1010", "1101", ""},
 
 		// Octal with underscores
-		{"Octal with underscores", "0o12_34_56", 8, "123456", "", ""},
-		{"Octal float with underscores", "0o12_3.45_6", 8, "123", "456", ""},
+		{"Octal with underscores", "0o12_34_56", "0o", 8, "123456", "", ""},
+		{"Octal float with underscores", "0o12_3.45_6", "0o", 8, "123", "456", ""},
 
 		// Hexadecimal with underscores
-		{"Hex with underscores", "0xDE_AD_BE_EF", 16, "DEADBEEF", "", ""},
-		{"Hex float with underscores", "0xFF_AA.BB_CC", 16, "FFAA", "BBCC", ""},
+		{"Hex with underscores", "0xDE_AD_BE_EF", "0x", 16, "DEADBEEF", "", ""},
+		{"Hex float with underscores", "0xFF_AA.BB_CC", "0x", 16, "FFAA", "BBCC", ""},
 
 		// rR notation with underscores
-		{"Binary rR with underscores", "2r10_10_11", 2, "101011", "", ""},
-		{"Hex rR with underscores", "16rDE_AD_BE_EF", 16, "DEADBEEF", "", ""},
-		{"Base 36 with underscores", "36rHE_LL_O", 36, "HELLO", "", ""},
-		{"rR float with underscores", "16rAB_C.DE_F", 16, "ABC", "DEF", ""},
-		{"rR scientific with underscores", "10r12_3e45", 10, "123", "", "45"},
-		{"rR float scientific with underscores", "16rAB_C.DE_Fe10", 16, "ABC", "DEF", "10"},
+		{"Binary rR with underscores", "2r10_10_11", "2r", 2, "101011", "", ""},
+		{"Hex rR with underscores", "16rDE_AD_BE_EF", "16r", 16, "DEADBEEF", "", ""},
+		{"Base 36 with underscores", "36rHE_LL_O", "36r", 36, "HELLO", "", ""},
+		{"rR float with underscores", "16rAB_C.DE_F", "16r", 16, "ABC", "DEF", ""},
+		{"rR scientific with underscores", "10r12_3e45", "10r", 10, "123", "", "45"},
+		{"rR float scientific with underscores", "16rAB_C.DE_Fe10", "16r", 16, "ABC", "DEF", "10"},
 
 		// Edge cases
-		{"Single underscore in mantissa", "1_2", 10, "12", "", ""},
-		{"Multiple underscores", "1_2_3_4", 10, "1234", "", ""},
-		{"Underscores in fraction only", "12.3_4_5", 10, "12", "345", ""},
-		{"Complex case", "36rA_B_C.D_E_Fe+12", 36, "ABC", "DEF", "+12"},
+		{"Single underscore in mantissa", "1_2", "", 10, "12", "", ""},
+		{"Multiple underscores", "1_2_3_4", "", 10, "1234", "", ""},
+		{"Underscores in fraction only", "12.3_4_5", "", 10, "12", "345", ""},
+		{"Complex case", "36rA_B_C.D_E_Fe+12", "36r", 36, "ABC", "DEF", "+12"},
 	}
 
 	for _, tt := range tests {
@@ -376,7 +387,7 @@ func TestNumericWithUnderscores(t *testing.T) {
 			}
 
 			if token.Radix == nil || *token.Radix != tt.expectedRadix {
-				t.Errorf("Expected radix %d, got %v", tt.expectedRadix, token.Radix)
+				t.Errorf("invalid numeric literal")
 			}
 
 			if token.Mantissa == nil || *token.Mantissa != tt.expectedMantissa {
@@ -410,42 +421,43 @@ func TestBalancedTernaryTokens(t *testing.T) {
 	tests := []struct {
 		name             string
 		input            string
-		expectedRadix    int
+		expectedRadix    string
+		expectedBase     int
 		expectedMantissa string
 		expectedFraction string
 		expectedExponent string
 		expectedBalanced bool
 	}{
 		// Basic balanced ternary integers
-		{"Simple balanced ternary", "0t10", 3, "10", "", "", true},
-		{"Negative balanced ternary", "0tT1", 3, "T1", "", "", true},
-		{"Complex balanced ternary", "0t1T0", 3, "1T0", "", "", true},
-		{"All zeros", "0t000", 3, "000", "", "", true},
-		{"All ones", "0t111", 3, "111", "", "", true},
-		{"All T (negative)", "0tTTT", 3, "TTT", "", "", true},
+		{"Simple balanced ternary", "0t10", "0t", 3, "10", "", "", true},
+		{"Negative balanced ternary", "0tT1", "0t", 3, "T1", "", "", true},
+		{"Complex balanced ternary", "0t1T0", "0t", 3, "1T0", "", "", true},
+		{"All zeros", "0t000", "0t", 3, "000", "", "", true},
+		{"All ones", "0t111", "0t", 3, "111", "", "", true},
+		{"All T (negative)", "0tTTT", "0t", 3, "TTT", "", "", true},
 
 		// Balanced ternary with fractions
-		{"Mixed integer and fraction", "0t1.T", 3, "1", "T", "", true},
-		{"Complex fraction", "0tT.01", 3, "T", "01", "", true},
-		{"Long fraction", "0t10.1T0", 3, "10", "1T0", "", true},
+		{"Mixed integer and fraction", "0t1.T", "0t", 3, "1", "T", "", true},
+		{"Complex fraction", "0tT.01", "0t", 3, "T", "01", "", true},
+		{"Long fraction", "0t10.1T0", "0t", 3, "10", "1T0", "", true},
 
 		// Balanced ternary with scientific notation
-		{"Balanced ternary with exponent", "0tTTe-2", 3, "TT", "", "-2", true},
-		{"Integer with positive exponent", "0t10e+3", 3, "10", "", "+3", true},
-		{"Fraction with exponent", "0t1.Te5", 3, "1", "T", "5", true},
-		{"Complex with exponent", "0t1T0.01e-4", 3, "1T0", "01", "-4", true},
+		{"Balanced ternary with exponent", "0tTTe-2", "0t", 3, "TT", "", "-2", true},
+		{"Integer with positive exponent", "0t10e+3", "0t", 3, "10", "", "+3", true},
+		{"Fraction with exponent", "0t1.Te5", "0t", 3, "1", "T", "5", true},
+		{"Complex with exponent", "0t1T0.01e-4", "0t", 3, "1T0", "01", "-4", true},
 
 		// Balanced ternary with underscores
-		{"Underscores in mantissa", "0t1_0_T", 3, "10T", "", "", true},
-		{"Underscores in fraction", "0t10.1_T_0", 3, "10", "1T0", "", true},
-		{"Underscores in both", "0t1_T.0_1", 3, "1T", "01", "", true},
-		{"Complex with underscores", "0t1_T_0.T_0_1e+2", 3, "1T0", "T01", "+2", true},
+		{"Underscores in mantissa", "0t1_0_T", "0t", 3, "10T", "", "", true},
+		{"Underscores in fraction", "0t10.1_T_0", "0t", 3, "10", "1T0", "", true},
+		{"Underscores in both", "0t1_T.0_1", "0t", 3, "1T", "01", "", true},
+		{"Complex with underscores", "0t1_T_0.T_0_1e+2", "0t", 3, "1T0", "T01", "+2", true},
 
 		// Edge cases
-		{"Single digit zero", "0t0", 3, "0", "", "", true},
-		{"Single digit one", "0t1", 3, "1", "", "", true},
-		{"Single digit T", "0tT", 3, "T", "", "", true},
-		{"Multiple underscores", "0t1_1_1_T_T_T", 3, "111TTT", "", "", true},
+		{"Single digit zero", "0t0", "0t", 3, "0", "", "", true},
+		{"Single digit one", "0t1", "0t", 3, "1", "", "", true},
+		{"Single digit T", "0tT", "0t", 3, "T", "", "", true},
+		{"Multiple underscores", "0t1_1_1_T_T_T", "0t", 3, "111TTT", "", "", true},
 	}
 
 	for _, tt := range tests {
@@ -469,7 +481,7 @@ func TestBalancedTernaryTokens(t *testing.T) {
 			}
 
 			if token.Radix == nil || *token.Radix != tt.expectedRadix {
-				t.Errorf("Expected radix %d, got %v", tt.expectedRadix, token.Radix)
+				t.Errorf("invalid numeric literal")
 			}
 
 			if token.Mantissa == nil || *token.Mantissa != tt.expectedMantissa {
