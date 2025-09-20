@@ -23,7 +23,7 @@ var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
 	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
-	numericRegex    = regexp.MustCompile(`^(?:0[bB][01]+|0[oO][0-7]+|0[xX][0-9a-fA-F]+|\d+)(?:\.\d*)?(?:[eE][+-]?\d+)?`)
+	numericRegex    = regexp.MustCompile(`^(?:0x[0-9A-F]+|0b[01]+|0o[0-7]+|(?:[2-9]|[12]\d|3[0-6])r[0-9A-Z]+|\d+)(?:\.[0-9A-Z]*)?(?:e[+-]?\d+)?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
 )
 
@@ -495,28 +495,55 @@ func (t *Tokeniser) matchNumeric() *Token {
 	var fraction, exponent string
 
 	// Determine radix and extract components
-	if strings.HasPrefix(match, "0b") || strings.HasPrefix(match, "0B") {
+	if strings.HasPrefix(match, "0b") {
 		radix = 2
 		mantissa = match[2:]
-	} else if strings.HasPrefix(match, "0o") || strings.HasPrefix(match, "0O") {
+	} else if strings.HasPrefix(match, "0o") {
 		radix = 8
 		mantissa = match[2:]
-	} else if strings.HasPrefix(match, "0x") || strings.HasPrefix(match, "0X") {
+	} else if strings.HasPrefix(match, "0x") {
 		radix = 16
 		mantissa = match[2:]
+	} else if rIndex := strings.Index(match, "r"); rIndex != -1 {
+		// Handle rR notation (e.g., 2r1010, 16rFF, 36rHELLO)
+		radixStr := match[:rIndex]
+		mantissa = match[rIndex+1:]
+		
+		// Parse radix from string
+		if len(radixStr) > 0 {
+			parsedRadix := 0
+			for _, digit := range radixStr {
+				if digit >= '0' && digit <= '9' {
+					parsedRadix = parsedRadix*10 + int(digit-'0')
+				} else {
+					// Invalid radix, treat as decimal
+					radix = 10
+					mantissa = match
+					goto extractFraction
+				}
+			}
+			if parsedRadix >= 2 && parsedRadix <= 36 {
+				radix = parsedRadix
+			} else {
+				// Invalid radix range, treat as decimal
+				radix = 10
+				mantissa = match
+			}
+		}
 	}
 
+extractFraction:
 	// Extract decimal point and fraction
 	if dotIndex := strings.Index(mantissa, "."); dotIndex != -1 {
 		fraction = mantissa[dotIndex+1:]
 		mantissa = mantissa[:dotIndex]
 
 		// Remove exponent from fraction if present
-		if eIndex := strings.IndexAny(fraction, "eE"); eIndex != -1 {
+		if eIndex := strings.Index(fraction, "e"); eIndex != -1 {
 			exponent = fraction[eIndex+1:]
 			fraction = fraction[:eIndex]
 		}
-	} else if eIndex := strings.IndexAny(mantissa, "eE"); eIndex != -1 {
+	} else if eIndex := strings.Index(mantissa, "e"); eIndex != -1 {
 		exponent = mantissa[eIndex+1:]
 		mantissa = mantissa[:eIndex]
 	}

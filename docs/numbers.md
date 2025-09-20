@@ -24,7 +24,7 @@ It is also possible to write these in other bases apart from base 10.
 To assist the parser, which is the next stage in the compilation pipeline, we 
 split the token up into:
 
-- decimalradix, the radix in decimal notation (int > 1)
+- decimalradix, the radix in decimal notation (int n, 2 <= n <= 36)
 - mantissa, the digits (or upper case letters) before the decimal point
 - fraction, the digits (or upper case letters) after the decimal point
 - exponent, the radix in decimal notation (int)
