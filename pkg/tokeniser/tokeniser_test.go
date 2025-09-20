@@ -96,13 +96,61 @@ func TestNumericTokens(t *testing.T) {
 		expectedFraction string
 		expectedExponent string
 	}{
+		// Existing decimal tests
 		{"42", 10, "42", "", ""},
-		{"0x2A", 16, "2A", "", ""},
-		{"0b101010", 2, "101010", "", ""},
-		{"0o52", 8, "52", "", ""},
 		{"3.14", 10, "3", "14", ""},
 		{"1.5e10", 10, "1", "5", "10"},
 		{"2e-3", 10, "2", "", "-3"},
+		
+		// Traditional prefix tests
+		{"0x2A", 16, "2A", "", ""},
+		{"0xFF", 16, "FF", "", ""},
+		{"0x1A", 16, "1A", "", ""},
+		{"0b101010", 2, "101010", "", ""},
+		{"0b1010", 2, "1010", "", ""},
+		{"0b11", 2, "11", "", ""},
+		{"0o52", 8, "52", "", ""},
+		{"0o127", 8, "127", "", ""},
+		{"0o777", 8, "777", "", ""},
+		
+		// New rR notation tests - basic
+		{"2r1010", 2, "1010", "", ""},
+		{"8r77", 8, "77", "", ""},
+		{"16rFF", 16, "FF", "", ""},
+		{"36rHELLO", 36, "HELLO", "", ""},
+		{"10rAB", 10, "AB", "", ""},
+		{"16rDEADBEEF", 16, "DEADBEEF", "", ""},
+		{"36rZEBRA", 36, "ZEBRA", "", ""},
+		
+		// rR notation with floating point
+		{"2r1010.11", 2, "1010", "11", ""},
+		{"16rFF.A", 16, "FF", "A", ""},
+		{"36rHELLO.WORLD", 36, "HELLO", "WORLD", ""},
+		{"8r123.456", 8, "123", "456", ""},
+		{"16r1A.BC", 16, "1A", "BC", ""},
+		
+		// rR notation with scientific notation
+		{"10r123e5", 10, "123", "", "5"},
+		{"16rABe-2", 16, "AB", "", "-2"},
+		{"2r101e+3", 2, "101", "", "+3"},
+		{"8r777e10", 8, "777", "", "10"},
+		
+		// rR notation with both fraction and exponent
+		{"10r12.34e5", 10, "12", "34", "5"},
+		{"16rAB.CDe-2", 16, "AB", "CD", "-2"},
+		{"2r10.11e+3", 2, "10", "11", "+3"},
+		
+		// Edge cases for radix values
+		{"2r101", 2, "101", "", ""},     // minimum radix
+		{"36rZ", 36, "Z", "", ""},       // maximum radix
+		{"9rAB", 9, "AB", "", ""},       // single digit radix
+		{"35rYZ", 35, "YZ", "", ""},     // near maximum radix
+		{"12rAB", 12, "AB", "", ""},     // double digit radix
+		
+		// Complex cases
+		{"16rDEAD.BEEFe10", 16, "DEAD", "BEEF", "10"},
+		{"36rHELLO.WORLDe-5", 36, "HELLO", "WORLD", "-5"},
+		{"8r123.456e+7", 8, "123", "456", "+7"},
 	}
 
 	for _, tt := range tests {
@@ -123,6 +171,117 @@ func TestNumericTokens(t *testing.T) {
 			token := tokens[0]
 			if token.Type != NumericLiteral {
 				t.Errorf("Expected numeric token, got %s", token.Type)
+			}
+
+			if token.Radix == nil || *token.Radix != tt.expectedRadix {
+				t.Errorf("Expected radix %d, got %v", tt.expectedRadix, token.Radix)
+			}
+
+			if token.Mantissa == nil || *token.Mantissa != tt.expectedMantissa {
+				t.Errorf("Expected mantissa '%s', got %v", tt.expectedMantissa, token.Mantissa)
+			}
+
+			if tt.expectedFraction == "" {
+				if token.Fraction != nil {
+					t.Errorf("Expected no fraction, got '%s'", *token.Fraction)
+				}
+			} else {
+				if token.Fraction == nil || *token.Fraction != tt.expectedFraction {
+					t.Errorf("Expected fraction '%s', got %v", tt.expectedFraction, token.Fraction)
+				}
+			}
+
+			if tt.expectedExponent == "" {
+				if token.Exponent != nil {
+					t.Errorf("Expected no exponent, got '%s'", *token.Exponent)
+				}
+			} else {
+				if token.Exponent == nil || *token.Exponent != tt.expectedExponent {
+					t.Errorf("Expected exponent '%s', got %v", tt.expectedExponent, token.Exponent)
+				}
+			}
+		})
+	}
+}
+
+func TestEnhancedNumericEdgeCases(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            string
+		expectedTokens   int
+		expectedRadix    int
+		expectedMantissa string
+		expectedFraction string
+		expectedExponent string
+	}{
+		// Test proper case sensitivity - only uppercase digits allowed
+		{"Lowercase e exponent", "10r123e5", 1, 10, "123", "", "5"},
+		
+		// Test boundary radix values
+		{"Minimum radix", "2r1", 1, 2, "1", "", ""},
+		{"Maximum radix", "36rZ", 1, 36, "Z", "", ""},
+		{"Near maximum radix", "35rY", 1, 35, "Y", "", ""},
+		
+		// Test multi-digit radix values
+		{"Double digit radix 10", "10r9", 1, 10, "9", "", ""},
+		{"Double digit radix 16", "16rF", 1, 16, "F", "", ""},
+		{"Double digit radix 36", "36rZ", 1, 36, "Z", "", ""},
+		
+		// Test comprehensive digit ranges for different bases
+		{"Base 2 max digits", "2r1", 1, 2, "1", "", ""},
+		{"Base 8 max digits", "8r7", 1, 8, "7", "", ""},
+		{"Base 10 max digits", "10r9", 1, 10, "9", "", ""},
+		{"Base 16 max digits", "16rF", 1, 16, "F", "", ""},
+		{"Base 36 max digits", "36rZ", 1, 36, "Z", "", ""},
+		
+		// Test floating point in various bases
+		{"Binary floating point", "2r1.1", 1, 2, "1", "1", ""},
+		{"Octal floating point", "8r7.6", 1, 8, "7", "6", ""},
+		{"Hex floating point", "16rF.E", 1, 16, "F", "E", ""},
+		{"Base 36 floating point", "36rZ.Y", 1, 36, "Z", "Y", ""},
+		
+		// Test scientific notation in various bases
+		{"Binary scientific", "2r1e2", 1, 2, "1", "", "2"},
+		{"Hex scientific", "16rFe10", 1, 16, "F", "", "10"},
+		{"Base 36 scientific", "36rZe5", 1, 36, "Z", "", "5"},
+		
+		// Test combined floating point and scientific notation
+		{"Hex float scientific", "16rA.Be-2", 1, 16, "A", "B", "-2"},
+		{"Base 36 float scientific", "36rH.ELLOe+10", 1, 36, "H", "ELLO", "+10"},
+		
+		// Test complex realistic examples
+		{"Hex color value", "16rFFFFFF", 1, 16, "FFFFFF", "", ""},
+		{"Base 36 word", "36rHELLOWORLD", 1, 36, "HELLOWORLD", "", ""},
+		{"Large hex number", "16rDEADBEEF", 1, 16, "DEADBEEF", "", ""},
+		
+		// Test edge cases with scientific notation avoiding lowercase conflicts
+		{"Hex with exponent", "16rABCe5", 1, 16, "ABC", "", "5"},
+		{"Base 36 avoiding E digit", "36rHELLe10", 1, 36, "HELL", "", "10"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokeniser := New(tt.input)
+			tokens, err := tokeniser.Tokenise()
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(tokens) != tt.expectedTokens {
+				t.Errorf("Expected %d tokens, got %d", tt.expectedTokens, len(tokens))
+				return
+			}
+
+			if tt.expectedTokens == 0 {
+				return // No token to verify
+			}
+
+			token := tokens[0]
+			if token.Type != NumericLiteral {
+				t.Errorf("Expected numeric token, got %s", token.Type)
+				return
 			}
 
 			if token.Radix == nil || *token.Radix != tt.expectedRadix {
