@@ -24,8 +24,10 @@ var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
 	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
-	numericRegex    = regexp.MustCompile(`^(?:\d+[xobt][0-9A-Z]+(?:_[0-9A-Z]+)*|\d+r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z01T]*(?:_[0-9A-Z01T]+)*)?(?:e[+-]?\d+)?`)
-	commentRegex    = regexp.MustCompile(`^###.*`)
+	// numericRegex    = regexp.MustCompile(`^(?:\d+[xobt][0-9A-Z]+(?:_[0-9A-Z]+)*|\d+r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z01T]*(?:_[0-9A-Z01T]+)*)?(?:e[+-]?\d+)?`)
+	radixRegex   = regexp.MustCompile(`^(\d+[xobtr])([0-9A-Z]+(?:_[0-9A-Z]+)*)(\.[0-9A-Z]*(?:_[0-9A-Z]+)*)?(?:e([+-]?\d+))?`)
+	decimalRegex = regexp.MustCompile(`^(\d+(?:_\d+)*)(\.\d*(?:_\d+)*)?(?:e([+-]?\d+))?`)
+	commentRegex = regexp.MustCompile(`^###.*`)
 )
 
 // Start token mappings with expecting and closed_by information
@@ -495,127 +497,150 @@ func (t *Tokeniser) matchString() *Token {
 
 // matchNumeric attempts to match a numeric literal.
 func (t *Tokeniser) matchNumeric() *Token {
-	match := numericRegex.FindString(t.input[t.position:])
-	if match == "" {
-		return nil
+	// First try to match radix-based numbers (must check before decimal)
+	if radixMatch := radixRegex.FindStringSubmatch(t.input[t.position:]); radixMatch != nil {
+		return t.parseRadixNumber(radixMatch)
 	}
+	
+	// Then try to match decimal numbers
+	if decimalMatch := decimalRegex.FindStringSubmatch(t.input[t.position:]); decimalMatch != nil {
+		return t.parseDecimalNumber(decimalMatch)
+	}
+	
+	return nil
+}
 
-	radix := 10
+// parseRadixNumber parses a number with radix notation (e.g., 0x, 0o, 0b, 0t, or nr).
+func (t *Tokeniser) parseRadixNumber(match []string) *Token {
+	fullMatch := match[0]
+	radixPart := match[1]
+	mantissa := match[2]
+	fraction := ""
+	exponent := ""
+	
+	if len(match) > 3 && match[3] != "" {
+		fraction = match[3][1:] // Remove the leading dot
+	}
+	if len(match) > 4 && match[4] != "" {
+		exponent = match[4] // Already without the 'e'
+	}
+	
+	// Extract radix prefix and determine base
+	lastChar := radixPart[len(radixPart)-1]
 	radixPrefix := ""
-	mantissa := match
-	var fraction, exponent string
-
-	// Determine radix and extract components
-	if strings.Contains(match, "x") {
-		// Handle hex notation (0x prefix required)
-		xIndex := strings.Index(match, "x")
-		radix = 16
-		radixPrefix = "0x"
-		mantissa = match[xIndex+1:]
-	} else if strings.Contains(match, "o") {
-		// Handle octal notation (0o prefix required)
-		oIndex := strings.Index(match, "o")
-		radix = 8
-		radixPrefix = "0o"
-		mantissa = match[oIndex+1:]
-	} else if strings.Contains(match, "b") {
-		// Handle binary notation (0b prefix required)
-		bIndex := strings.Index(match, "b")
-		radix = 2
-		radixPrefix = "0b"
-		mantissa = match[bIndex+1:]
-	} else if strings.Contains(match, "t") {
-		// Handle balanced ternary notation (0t prefix required)
-		tIndex := strings.Index(match, "t")
-		mantissa = match[tIndex+1:]
-
-		// Extract decimal point and fraction for balanced ternary
-		if dotIndex := strings.Index(mantissa, "."); dotIndex != -1 {
-			fraction = mantissa[dotIndex+1:]
-			mantissa = mantissa[:dotIndex]
-
-			// Remove exponent from fraction if present
-			if eIndex := strings.Index(fraction, "e"); eIndex != -1 {
-				exponent = fraction[eIndex+1:]
-				fraction = fraction[:eIndex]
-			}
-		} else if eIndex := strings.Index(mantissa, "e"); eIndex != -1 {
-			exponent = mantissa[eIndex+1:]
-			mantissa = mantissa[:eIndex]
+	base := 10
+	
+	switch lastChar {
+	case 'x':
+		if radixPart == "0x" {
+			radixPrefix = "0x"
+			base = 16
+		} else {
+			// Invalid hex format - should be 0x
+			return t.createExceptionToken(fullMatch, "invalid literal")
 		}
-
-		// Remove underscores from mantissa and fraction
-		mantissa = strings.ReplaceAll(mantissa, "_", "")
-		if fraction != "" {
-			fraction = strings.ReplaceAll(fraction, "_", "")
+	case 'o':
+		if radixPart == "0o" {
+			radixPrefix = "0o"
+			base = 8
+		} else {
+			// Invalid octal format - should be 0o
+			return t.createExceptionToken(fullMatch, "invalid literal")
 		}
-
-		end := Position{Line: t.line, Col: t.column + len(match)}
-		span := Span{End: end}
-
-		t.advance(len(match))
-
-		// Create balanced ternary token
-		return NewBalancedTernaryToken(match, mantissa, fraction, exponent, span)
-	} else if rIndex := strings.Index(match, "r"); rIndex != -1 {
-		// Handle rR notation (e.g., 2r1010, 16rFF, 36rHELLO)
-		radixStr := match[:rIndex]
-		radixPrefix = radixStr + "r"
-		mantissa = match[rIndex+1:]
-
-		// Parse radix from string
-		if len(radixStr) > 0 {
-			parsedRadix := 0
-			for _, digit := range radixStr {
-				if digit >= '0' && digit <= '9' {
-					parsedRadix = parsedRadix*10 + int(digit-'0')
-				} else {
-					// Invalid radix, treat as decimal
-					radix = 10
-					radixPrefix = ""
-					mantissa = match
-					goto extractFraction
-				}
+	case 'b':
+		if radixPart == "0b" {
+			radixPrefix = "0b"
+			base = 2
+		} else {
+			// Invalid binary format - should be 0b
+			return t.createExceptionToken(fullMatch, "invalid literal")
+		}
+	case 't':
+		if radixPart == "0t" {
+			// Handle balanced ternary
+			mantissa = strings.ReplaceAll(mantissa, "_", "")
+			if fraction != "" {
+				fraction = strings.ReplaceAll(fraction, "_", "")
 			}
-			if parsedRadix >= 2 && parsedRadix <= 36 {
-				radix = parsedRadix
+			
+			end := Position{Line: t.line, Col: t.column + len(fullMatch)}
+			span := Span{End: end}
+			t.advance(len(fullMatch))
+			
+			return NewBalancedTernaryToken(fullMatch, mantissa, fraction, exponent, span)
+		} else {
+			// Invalid ternary format - should be 0t
+			return t.createExceptionToken(fullMatch, "invalid literal")
+		}
+	case 'r':
+		// Parse the radix number (e.g., "2r", "16r", "36r")
+		radixStr := radixPart[:len(radixPart)-1]
+		radixPrefix = radixPart
+		
+		parsedRadix := 0
+		for _, digit := range radixStr {
+			if digit >= '0' && digit <= '9' {
+				parsedRadix = parsedRadix*10 + int(digit-'0')
 			} else {
-				// Invalid radix range, treat as decimal
-				radix = 10
-				radixPrefix = ""
-				mantissa = match
+				return t.createExceptionToken(fullMatch, "invalid literal")
 			}
 		}
-	}
-
-extractFraction:
-	// Extract decimal point and fraction
-	if dotIndex := strings.Index(mantissa, "."); dotIndex != -1 {
-		fraction = mantissa[dotIndex+1:]
-		mantissa = mantissa[:dotIndex]
-
-		// Remove exponent from fraction if present
-		if eIndex := strings.Index(fraction, "e"); eIndex != -1 {
-			exponent = fraction[eIndex+1:]
-			fraction = fraction[:eIndex]
+		
+		if parsedRadix < 2 || parsedRadix > 36 {
+			return t.createExceptionToken(fullMatch, "invalid literal")
 		}
-	} else if eIndex := strings.Index(mantissa, "e"); eIndex != -1 {
-		exponent = mantissa[eIndex+1:]
-		mantissa = mantissa[:eIndex]
+		
+		base = parsedRadix
+	default:
+		return t.createExceptionToken(fullMatch, "invalid literal")
 	}
-
-	// Remove underscores from mantissa and fraction as per specification
-	// The stored values should exclude underscores
+	
+	// Remove underscores from mantissa and fraction
 	mantissa = strings.ReplaceAll(mantissa, "_", "")
 	if fraction != "" {
 		fraction = strings.ReplaceAll(fraction, "_", "")
 	}
-
-	end := Position{Line: t.line, Col: t.column + len(match)}
+	
+	end := Position{Line: t.line, Col: t.column + len(fullMatch)}
 	span := Span{End: end}
+	t.advance(len(fullMatch))
+	
+	return NewNumericToken(fullMatch, radixPrefix, base, mantissa, fraction, exponent, span)
+}
 
-	t.advance(len(match))
-	return NewNumericToken(match, radixPrefix, radix, mantissa, fraction, exponent, span)
+// parseDecimalNumber parses a decimal number.
+func (t *Tokeniser) parseDecimalNumber(match []string) *Token {
+	fullMatch := match[0]
+	mantissa := match[1]
+	fraction := ""
+	exponent := ""
+	
+	if len(match) > 2 && match[2] != "" {
+		fraction = match[2][1:] // Remove the leading dot
+	}
+	if len(match) > 3 && match[3] != "" {
+		exponent = match[3] // Already without the 'e'
+	}
+	
+	// Remove underscores from mantissa and fraction
+	mantissa = strings.ReplaceAll(mantissa, "_", "")
+	if fraction != "" {
+		fraction = strings.ReplaceAll(fraction, "_", "")
+	}
+	
+	end := Position{Line: t.line, Col: t.column + len(fullMatch)}
+	span := Span{End: end}
+	t.advance(len(fullMatch))
+	
+	return NewNumericToken(fullMatch, "", 10, mantissa, fraction, exponent, span)
+}
+
+// createExceptionToken creates an exception token for invalid numeric formats.
+func (t *Tokeniser) createExceptionToken(text, reason string) *Token {
+	end := Position{Line: t.line, Col: t.column + len(text)}
+	span := Span{End: end}
+	t.advance(len(text))
+	return NewExceptionToken(text, reason, span)
 }
 
 // matchIdentifier attempts to match an identifier.
