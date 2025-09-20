@@ -922,6 +922,275 @@ func TestExceptionTokens(t *testing.T) {
 	}
 }
 
+func TestNewlineTracking(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []struct {
+			text     string
+			lnBefore *bool
+			lnAfter  *bool
+		}
+	}{
+		{
+			name:  "Single line, no newlines",
+			input: "a b c",
+			expected: []struct {
+				text     string
+				lnBefore *bool
+				lnAfter  *bool
+			}{
+				{"a", nil, nil}, // no newlines before or after
+				{"b", nil, nil}, // no newlines before or after
+				{"c", nil, nil}, // no newlines before or after
+			},
+		},
+		{
+			name:  "Simple newline between tokens",
+			input: "a\nb",
+			expected: []struct {
+				text     string
+				lnBefore *bool
+				lnAfter  *bool
+			}{
+				{"a", nil, boolPtr(true)}, // newline after
+				{"b", boolPtr(true), nil}, // newline before
+			},
+		},
+		{
+			name:  "Multiple newlines",
+			input: "a\n\nb",
+			expected: []struct {
+				text     string
+				lnBefore *bool
+				lnAfter  *bool
+			}{
+				{"a", nil, boolPtr(true)}, // newline after
+				{"b", boolPtr(true), nil}, // newline before
+			},
+		},
+		{
+			name:  "Mixed spaces and newlines",
+			input: "a  \n  b",
+			expected: []struct {
+				text     string
+				lnBefore *bool
+				lnAfter  *bool
+			}{
+				{"a", nil, boolPtr(true)}, // newline after (in the whitespace)
+				{"b", boolPtr(true), nil}, // newline before (in the whitespace)
+			},
+		},
+		{
+			name:  "Three tokens on separate lines",
+			input: "x\ny\nz",
+			expected: []struct {
+				text     string
+				lnBefore *bool
+				lnAfter  *bool
+			}{
+				{"x", nil, boolPtr(true)},           // newline after
+				{"y", boolPtr(true), boolPtr(true)}, // newlines before and after
+				{"z", boolPtr(true), nil},           // newline before
+			},
+		},
+		{
+			name:  "Comment treated as newline",
+			input: "a ### comment\nb",
+			expected: []struct {
+				text     string
+				lnBefore *bool
+				lnAfter  *bool
+			}{
+				{"a", nil, boolPtr(true)}, // comment after is treated as newline
+				{"b", boolPtr(true), nil}, // newline before
+			},
+		},
+		{
+			name:  "Complex multi-line example",
+			input: "def foo(x)\n    return x + 1\nend",
+			expected: []struct {
+				text     string
+				lnBefore *bool
+				lnAfter  *bool
+			}{
+				{"def", nil, nil},              // followed by space
+				{"foo", nil, nil},              // followed by (
+				{"(", nil, nil},                // followed by x
+				{"x", nil, nil},                // followed by )
+				{")", nil, boolPtr(true)},      // followed by newline
+				{"return", boolPtr(true), nil}, // preceded by newline, followed by space
+				{"x", nil, nil},                // followed by space
+				{"+", nil, nil},                // followed by space
+				{"1", nil, boolPtr(true)},      // followed by newline
+				{"end", boolPtr(true), nil},    // preceded by newline
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokeniser := New(tt.input)
+			tokens, err := tokeniser.Tokenise()
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(tokens) != len(tt.expected) {
+				t.Errorf("Expected %d tokens, got %d", len(tt.expected), len(tokens))
+				return
+			}
+
+			for i, token := range tokens {
+				expected := tt.expected[i]
+
+				if token.Text != expected.text {
+					t.Errorf("Token %d: expected text %q, got %q", i, expected.text, token.Text)
+				}
+
+				// Check LnBefore
+				if expected.lnBefore == nil {
+					if token.LnBefore != nil {
+						t.Errorf("Token %d (%q): expected LnBefore to be nil, got %v", i, token.Text, *token.LnBefore)
+					}
+				} else {
+					if token.LnBefore == nil {
+						t.Errorf("Token %d (%q): expected LnBefore to be %v, got nil", i, token.Text, *expected.lnBefore)
+					} else if *token.LnBefore != *expected.lnBefore {
+						t.Errorf("Token %d (%q): expected LnBefore to be %v, got %v", i, token.Text, *expected.lnBefore, *token.LnBefore)
+					}
+				}
+
+				// Check LnAfter
+				if expected.lnAfter == nil {
+					if token.LnAfter != nil {
+						t.Errorf("Token %d (%q): expected LnAfter to be nil, got %v", i, token.Text, *token.LnAfter)
+					}
+				} else {
+					if token.LnAfter == nil {
+						t.Errorf("Token %d (%q): expected LnAfter to be %v, got nil", i, token.Text, *expected.lnAfter)
+					} else if *token.LnAfter != *expected.lnAfter {
+						t.Errorf("Token %d (%q): expected LnAfter to be %v, got %v", i, token.Text, *expected.lnAfter, *token.LnAfter)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestNewlineJSONSerialization(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []map[string]interface{}
+	}{
+		{
+			name:  "Token with newline before",
+			input: "\na",
+			expected: []map[string]interface{}{
+				{
+					"text":      "a",
+					"ln_before": true,
+				},
+			},
+		},
+		{
+			name:  "Token with newline after",
+			input: "a\n",
+			expected: []map[string]interface{}{
+				{
+					"text":     "a",
+					"ln_after": true,
+				},
+			},
+		},
+		{
+			name:  "Token with newlines before and after",
+			input: "\na\n",
+			expected: []map[string]interface{}{
+				{
+					"text":      "a",
+					"ln_before": true,
+					"ln_after":  true,
+				},
+			},
+		},
+		{
+			name:  "Token without newlines should not have ln_before/ln_after fields",
+			input: "a",
+			expected: []map[string]interface{}{
+				{
+					"text": "a",
+					// ln_before and ln_after should not be present in JSON
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokeniser := New(tt.input)
+			tokens, err := tokeniser.Tokenise()
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(tokens) != len(tt.expected) {
+				t.Errorf("Expected %d tokens, got %d", len(tt.expected), len(tokens))
+				return
+			}
+
+			for i, token := range tokens {
+				expected := tt.expected[i]
+
+				// Serialize token to JSON
+				jsonBytes, err := json.Marshal(token)
+				if err != nil {
+					t.Errorf("Failed to marshal token to JSON: %v", err)
+					continue
+				}
+
+				// Parse JSON back to map
+				var actual map[string]interface{}
+				if err := json.Unmarshal(jsonBytes, &actual); err != nil {
+					t.Errorf("Failed to unmarshal JSON: %v", err)
+					continue
+				}
+
+				// Check expected fields are present and correct
+				for key, expectedValue := range expected {
+					if actualValue, exists := actual[key]; !exists {
+						t.Errorf("Token %d: expected field %q to be present in JSON", i, key)
+					} else if actualValue != expectedValue {
+						t.Errorf("Token %d: expected %q to be %v, got %v", i, key, expectedValue, actualValue)
+					}
+				}
+
+				// Check that ln_before and ln_after are only present when they should be
+				if token.LnBefore == nil {
+					if _, exists := actual["ln_before"]; exists {
+						t.Errorf("Token %d: ln_before should not be present in JSON when LnBefore is nil", i)
+					}
+				}
+				if token.LnAfter == nil {
+					if _, exists := actual["ln_after"]; exists {
+						t.Errorf("Token %d: ln_after should not be present in JSON when LnAfter is nil", i)
+					}
+				}
+			}
+		})
+	}
+}
+
+// Helper function to create bool pointers for test expectations
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 // Helper function for writing test files
 func writeFile(filename, content string) error {
 	file, err := os.Create(filename)

@@ -292,7 +292,9 @@ func (t *Tokeniser) addTokenAndManageStack(token *Token) error {
 	t.position = savedPosition // Restore position since we're just peeking ahead
 	t.line = savedLine
 	t.column = savedColumn
-	token.LnAfter = &sawNewlineAfter
+	if sawNewlineAfter {
+		token.LnAfter = &sawNewlineAfter
+	}
 
 	t.tokens = append(t.tokens, token)
 
@@ -451,7 +453,7 @@ func (t *Tokeniser) nextToken() error {
 // Returns true if a newline (LF or CR) was encountered in the skipped content.
 func (t *Tokeniser) skipWhitespaceAndComments() bool {
 	sawNewline := false
-	
+
 	for t.position < len(t.input) {
 		// Check for comments first
 		if match := commentRegex.FindString(t.input[t.position:]); match != "" {
@@ -459,21 +461,21 @@ func (t *Tokeniser) skipWhitespaceAndComments() bool {
 			sawNewline = true // End-of-line comments always include a newline conceptually
 			continue
 		}
-		
+
 		// Check for whitespace
 		r, size := utf8.DecodeRuneInString(t.input[t.position:])
 		if !unicode.IsSpace(r) {
 			break
 		}
-		
+
 		// Check if this whitespace character is a newline
 		if r == '\n' || r == '\r' {
 			sawNewline = true
 		}
-		
+
 		t.advance(size)
 	}
-	
+
 	return sawNewline
 }
 
