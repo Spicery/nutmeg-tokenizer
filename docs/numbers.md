@@ -25,8 +25,9 @@ It is also possible to write these in other bases apart from base 10.
 
 ## Underscores
 
-Nutmeg uses a very similar rule to Python: underscores may be used between 
-any two characters of the mantissa or any two characters of the fraction.
+Nutmeg uses a very similar rule to Python: underscores may be used between any
+two characters of the mantissa or any two characters of the fraction. But they
+may not appear anywhere else in a number.
 
 ### Represetation as a token
 
@@ -34,7 +35,7 @@ To assist the parser, which is the next stage in the compilation pipeline, we
 split the token up into:
 
 - decimalradix, the radix in decimal notation (int n, 2 <= n <= 36)
-- mantissa, the digits (or upper case letters) before the decimal point
-- fraction, the digits (or upper case letters) after the decimal point
+- mantissa, the digits (or upper case letters) before the decimal point, excluding underscores
+- fraction, the digits (or upper case letters) after the decimal point, excluding underscores
 - exponent, the radix in decimal notation (int)
 

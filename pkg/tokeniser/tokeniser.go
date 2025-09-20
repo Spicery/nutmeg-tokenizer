@@ -23,7 +23,7 @@ var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
 	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
-	numericRegex    = regexp.MustCompile(`^(?:0x[0-9A-F]+|0b[01]+|0o[0-7]+|(?:[2-9]|[12]\d|3[0-6])r[0-9A-Z]+|\d+)(?:\.[0-9A-Z]*)?(?:e[+-]?\d+)?`)
+	numericRegex    = regexp.MustCompile(`^(?:0x[0-9A-F]+(?:_[0-9A-F]+)*|0b[01]+(?:_[01]+)*|0o[0-7]+(?:_[0-7]+)*|(?:[2-9]|[12]\d|3[0-6])r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z]*(?:_[0-9A-Z]+)*)?(?:e[+-]?\d+)?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
 )
 
@@ -546,6 +546,13 @@ extractFraction:
 	} else if eIndex := strings.Index(mantissa, "e"); eIndex != -1 {
 		exponent = mantissa[eIndex+1:]
 		mantissa = mantissa[:eIndex]
+	}
+
+	// Remove underscores from mantissa and fraction as per specification
+	// The stored values should exclude underscores
+	mantissa = strings.ReplaceAll(mantissa, "_", "")
+	if fraction != "" {
+		fraction = strings.ReplaceAll(fraction, "_", "")
 	}
 
 	end := Position{Line: t.line, Col: t.column + len(match)}

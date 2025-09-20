@@ -21,6 +21,7 @@ the following token types:
 -   [ - Open delimiter i.e. bracket/brace/parenthesis matching the regex `[\(\[\{]`
 -   ] - Close delimiter i.e. bracket/brace/parenthesis matching the regex `[\)\]\}]`
 -   U - Unclassified
+-   X - Exception token (used for tokens that should never appear in valid code, e.g. invalid number literals)
 
 The tokeniser will ignore whitespace and comments, end of line comments starting 
 with `###`.
@@ -53,6 +54,9 @@ Each token will be represented as a JSON object on a single line, with the follo
     - `closed_by`: The corresponding possible closing delimiter token text (e.g., `(` is closed by [`)`])
     - `infix`: A boolean indicating if the delimiter can be used as an infix operator (e.g., `[` can be used as an infix operator for array indexing)
     - `prefix`: A boolean indicating if the delimiter can be used as a prefix operator (e.g., `(` can be used as a prefix operator for grouping expressions)
+
+- X exception tokens will also have:
+    - `reason`: A string explaining why this token is classified as an exception (e.g., "invalid number literal")
 
 ## Temporary Files
 

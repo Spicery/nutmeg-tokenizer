@@ -315,6 +315,99 @@ func TestEnhancedNumericEdgeCases(t *testing.T) {
 	}
 }
 
+func TestNumericWithUnderscores(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            string
+		expectedRadix    int
+		expectedMantissa string
+		expectedFraction string
+		expectedExponent string
+	}{
+		// Decimal numbers with underscores
+		{"Decimal with underscores", "1_234_567", 10, "1234567", "", ""},
+		{"Decimal float with underscores", "3_14.15_92", 10, "314", "1592", ""},
+		{"Decimal scientific with underscores", "1_23e45", 10, "123", "", "45"},
+		{"Decimal float scientific with underscores", "1_23.45_67e89", 10, "123", "4567", "89"},
+
+		// Binary with underscores
+		{"Binary with underscores", "0b1010_1100", 2, "10101100", "", ""},
+		{"Binary float with underscores", "0b10_10.11_01", 2, "1010", "1101", ""},
+
+		// Octal with underscores
+		{"Octal with underscores", "0o12_34_56", 8, "123456", "", ""},
+		{"Octal float with underscores", "0o12_3.45_6", 8, "123", "456", ""},
+
+		// Hexadecimal with underscores
+		{"Hex with underscores", "0xDE_AD_BE_EF", 16, "DEADBEEF", "", ""},
+		{"Hex float with underscores", "0xFF_AA.BB_CC", 16, "FFAA", "BBCC", ""},
+
+		// rR notation with underscores
+		{"Binary rR with underscores", "2r10_10_11", 2, "101011", "", ""},
+		{"Hex rR with underscores", "16rDE_AD_BE_EF", 16, "DEADBEEF", "", ""},
+		{"Base 36 with underscores", "36rHE_LL_O", 36, "HELLO", "", ""},
+		{"rR float with underscores", "16rAB_C.DE_F", 16, "ABC", "DEF", ""},
+		{"rR scientific with underscores", "10r12_3e45", 10, "123", "", "45"},
+		{"rR float scientific with underscores", "16rAB_C.DE_Fe10", 16, "ABC", "DEF", "10"},
+
+		// Edge cases
+		{"Single underscore in mantissa", "1_2", 10, "12", "", ""},
+		{"Multiple underscores", "1_2_3_4", 10, "1234", "", ""},
+		{"Underscores in fraction only", "12.3_4_5", 10, "12", "345", ""},
+		{"Complex case", "36rA_B_C.D_E_Fe+12", 36, "ABC", "DEF", "+12"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokeniser := New(tt.input)
+			tokens, err := tokeniser.Tokenise()
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if len(tokens) != 1 {
+				t.Errorf("Expected 1 token, got %d", len(tokens))
+				return
+			}
+
+			token := tokens[0]
+			if token.Type != NumericLiteral {
+				t.Errorf("Expected numeric token, got %s", token.Type)
+			}
+
+			if token.Radix == nil || *token.Radix != tt.expectedRadix {
+				t.Errorf("Expected radix %d, got %v", tt.expectedRadix, token.Radix)
+			}
+
+			if token.Mantissa == nil || *token.Mantissa != tt.expectedMantissa {
+				t.Errorf("Expected mantissa '%s', got %v", tt.expectedMantissa, token.Mantissa)
+			}
+
+			if tt.expectedFraction == "" {
+				if token.Fraction != nil {
+					t.Errorf("Expected no fraction, got '%s'", *token.Fraction)
+				}
+			} else {
+				if token.Fraction == nil || *token.Fraction != tt.expectedFraction {
+					t.Errorf("Expected fraction '%s', got %v", tt.expectedFraction, token.Fraction)
+				}
+			}
+
+			if tt.expectedExponent == "" {
+				if token.Exponent != nil {
+					t.Errorf("Expected no exponent, got '%s'", *token.Exponent)
+				}
+			} else {
+				if token.Exponent == nil || *token.Exponent != tt.expectedExponent {
+					t.Errorf("Expected exponent '%s', got %v", tt.expectedExponent, token.Exponent)
+				}
+			}
+		})
+	}
+}
+
 func TestStartTokens(t *testing.T) {
 	tests := []struct {
 		input        string
