@@ -425,24 +425,24 @@ func TestBalancedTernaryTokens(t *testing.T) {
 		{"All zeros", "0t000", 3, "000", "", "", true},
 		{"All ones", "0t111", 3, "111", "", "", true},
 		{"All T (negative)", "0tTTT", 3, "TTT", "", "", true},
-		
+
 		// Balanced ternary with fractions
 		{"Mixed integer and fraction", "0t1.T", 3, "1", "T", "", true},
 		{"Complex fraction", "0tT.01", 3, "T", "01", "", true},
 		{"Long fraction", "0t10.1T0", 3, "10", "1T0", "", true},
-		
+
 		// Balanced ternary with scientific notation
 		{"Balanced ternary with exponent", "0tTTe-2", 3, "TT", "", "-2", true},
 		{"Integer with positive exponent", "0t10e+3", 3, "10", "", "+3", true},
 		{"Fraction with exponent", "0t1.Te5", 3, "1", "T", "5", true},
 		{"Complex with exponent", "0t1T0.01e-4", 3, "1T0", "01", "-4", true},
-		
+
 		// Balanced ternary with underscores
 		{"Underscores in mantissa", "0t1_0_T", 3, "10T", "", "", true},
 		{"Underscores in fraction", "0t10.1_T_0", 3, "10", "1T0", "", true},
 		{"Underscores in both", "0t1_T.0_1", 3, "1T", "01", "", true},
 		{"Complex with underscores", "0t1_T_0.T_0_1e+2", 3, "1T0", "T01", "+2", true},
-		
+
 		// Edge cases
 		{"Single digit zero", "0t0", 3, "0", "", "", true},
 		{"Single digit one", "0t1", 3, "1", "", "", true},

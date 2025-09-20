@@ -508,7 +508,7 @@ func (t *Tokeniser) matchNumeric() *Token {
 		// Handle balanced ternary (e.g., 0t10T, 0tT1.0)
 		radix = 3
 		mantissa = match[2:]
-		
+
 		// Extract decimal point and fraction for balanced ternary
 		if dotIndex := strings.Index(mantissa, "."); dotIndex != -1 {
 			fraction = mantissa[dotIndex+1:]
