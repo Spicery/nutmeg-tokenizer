@@ -1,0 +1,157 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.23', '1.24', '1.25']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache: false
+
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Verify dependencies
+      run: go mod verify
+    
+    - name: Format check
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+    
+    - name: Vet
+      run: go vet ./...
+    
+    - name: Run tests
+      run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+    
+    - name: Build
+      run: go build -v -o nutmeg-tokeniser ./cmd/nutmeg-tokeniser
+    
+    - name: Upload binary artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nutmeg-tokeniser-${{ matrix.go-version }}
+        path: nutmeg-tokeniser
+        retention-days: 1
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: false
+    
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=5m
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+        cache: false
+    
+    - name: Run Gosec Security Scanner
+      uses: securego/gosec@master
+      with:
+        args: './...'
+
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.23', '1.24', '1.25']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache: false
+
+    - name: Build
+      run: go build -o nutmeg-tokeniser ./cmd/nutmeg-tokeniser
+
+    - name: Test with example files
+      run: |
+        ./nutmeg-tokeniser --input examples/simple.nutmeg > /tmp/simple_output.json
+        ./nutmeg-tokeniser --input examples/numeric.nutmeg > /tmp/numeric_output.json
+        
+        # Verify the outputs are valid JSON
+        cat /tmp/simple_output.json | jq . > /dev/null
+        cat /tmp/numeric_output.json | jq . > /dev/null
+        
+        # Basic sanity checks
+        if [ $(cat /tmp/simple_output.json | wc -l) -eq 0 ]; then
+          echo "Error: simple.nutmeg produced no output"
+          exit 1
+        fi
+        
+        if [ $(cat /tmp/numeric_output.json | wc -l) -eq 0 ]; then
+          echo "Error: numeric.nutmeg produced no output"
+          exit 1
+        fi
+
+    - name: Test stdin input
+      run: |
+        echo "def test end" | ./nutmeg-tokeniser > /tmp/stdin_output.json
+        cat /tmp/stdin_output.json | jq . > /dev/null
+        
+        # Should have at least 3 tokens (def, test, end)
+        if [ $(cat /tmp/stdin_output.json | wc -l) -lt 3 ]; then
+          echo "Error: stdin input produced fewer tokens than expected"
+          exit 1
+        fi
+
+    - name: Test newline tracking
+      run: |
+        echo -e "a\nb" | ./nutmeg-tokeniser > /tmp/newline_output.json
+        cat /tmp/newline_output.json | jq . > /dev/null
+        
+        # Check that first token has ln_after and second has ln_before
+        if ! cat /tmp/newline_output.json | head -1 | jq -e '.ln_after == true' > /dev/null; then
+          echo "Error: first token should have ln_after=true"
+          exit 1
+        fi
+        
+        if ! cat /tmp/newline_output.json | tail -1 | jq -e '.ln_before == true' > /dev/null; then
+          echo "Error: second token should have ln_before=true"
+          exit 1
+        fi

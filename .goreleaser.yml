@@ -1,0 +1,96 @@
+# GoReleaser configuration
+version: 2
+
+project_name: nutmeg-tokeniser
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - main: ./cmd/nutmeg-tokeniser
+    binary: nutmeg-tokeniser
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.Version={{.Version}}
+    flags:
+      - -trimpath
+
+archives:
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+      - LICENSE*
+      - examples/
+      - docs/
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^build:'
+      - '^style:'
+      - '^refactor:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: Spicery
+    name: nutmeg-tokeniser
+  draft: false
+  prerelease: auto
+  name_template: "Release {{.Tag}}"
+  header: |
+    ## Changes in {{.Tag}}
+  footer: |
+    ## Docker Images
+    
+    Docker images are available on Docker Hub:
+    
+    ```bash
+    docker pull spicery/nutmeg-tokeniser:{{.Tag}}
+    docker pull spicery/nutmeg-tokeniser:latest
+    ```
+    
+    ## Usage
+    
+    Download the appropriate binary for your platform and run:
+    
+    ```bash
+    # Tokenize a file
+    ./nutmeg-tokeniser --input source.nutmeg --output tokens.json
+    
+    # Tokenize from stdin
+    echo "def foo end" | ./nutmeg-tokeniser
+    ```
