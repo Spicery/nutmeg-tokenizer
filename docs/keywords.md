@@ -16,14 +16,16 @@ Start tokens:
 
 The end tokens are always `end` or `end{START}`
 
-## Simple Labels (L)
+## Bridges (B)
+
+## single=false
 
 - `=>>`, expecting=[`do`]
 - do, expecting=[], in=[`for`, `def`]
 - then, expecting=[`else`, `elseif`, `elseifnot`, `catch`], in=[`try`, `if`]
 - else, expecting=[], in=[`if`, `try`]
 
-## Compound Labels (C)
+## single=true
 
 - catch, expecting=[`then`], in=[`try`]
 - elseif, expecting=[`then`], in=[`if`]

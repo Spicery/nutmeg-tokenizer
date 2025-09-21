@@ -683,18 +683,18 @@ func TestKeywordClassification(t *testing.T) {
 		expectedType TokenType
 	}{
 		// Label tokens (L)
-		{"=>>", LabelToken},
-		{"do", LabelToken},
-		{"then", LabelToken},
-		{"else", LabelToken},
+		{"=>>", BridgeToken},
+		{"do", BridgeToken},
+		{"then", BridgeToken},
+		{"else", BridgeToken},
 
 		// Unclassified tokens (U)
 		{":", UnclassifiedToken}, // bare wildcard without context
 
 		// Compound tokens (C)
-		{"catch", CompoundToken},
-		{"elseif", CompoundToken},
-		{"elseifnot", CompoundToken},
+		{"catch", BridgeToken},
+		{"elseif", BridgeToken},
+		{"elseifnot", BridgeToken},
 
 		// Prefix tokens (P)
 		{"return", PrefixToken},
@@ -799,8 +799,7 @@ func TestCustomRulesWildcard(t *testing.T) {
 	// Create a custom rules set with a different wildcard
 	rules := &TokenizerRules{
 		StartTokens:         getDefaultStartTokens(),
-		LabelTokens:         getDefaultLabelTokens(),
-		CompoundTokens:      getDefaultCompoundTokens(),
+		BridgeTokens:        getDefaultBridgeTokens(),
 		PrefixTokens:        getDefaultPrefixTokens(),
 		DelimiterMappings:   getDefaultDelimiterMappings(),
 		DelimiterProperties: getDefaultDelimiterProperties(),
@@ -831,7 +830,7 @@ func TestCustomRulesWildcard(t *testing.T) {
 		t.Errorf("Expected wildcard token text to be '*', got '%s'", wildcardToken.Text)
 	}
 
-	if wildcardToken.Type != LabelToken {
+	if wildcardToken.Type != BridgeToken {
 		t.Errorf("Expected wildcard token type to be Label, got %s", wildcardToken.Type)
 	}
 

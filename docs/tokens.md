@@ -13,8 +13,7 @@ The tokenizer produces tokens with the following type codes:
 - `s` - String literals with quotes and escapes
 - `S` - Start tokens (form start tokens like `def`, `if`, `while`)
 - `E` - End tokens (form end tokens like `end`, `endif`, `endwhile`)
-- `C` - Compound tokens (multi-part constructs)
-- `L` - Label tokens (label identifiers)
+- `B` - Bridge tokens (multi-part constructs)
 - `P` - Prefix tokens (prefix operators like `return`, `yield`)
 - `V` - Variable tokens (variable identifiers)
 - `O` - Operator tokens (infix/postfix operators)
@@ -80,13 +79,13 @@ The `span` field is serialized as a 4-element array `[start_line, start_col, end
 }
 ```
 
-### Label Tokens (`L`) and Compound Tokens (`C`)
+### Bridge Tokens (`B`)
 
 ```json
 {
   "text": "else",
   "span": [1, 1, 1, 4],
-  "type": "L",
+  "type": "B",
   "expecting": ["then"],    // What tokens can follow this label
   "in": ["if", "unless"]    // What start tokens can contain this label
 }
@@ -233,6 +232,10 @@ The following JSON schema defines the structure of all tokens:
       "items": { "type": "string" },
       "description": "Tokens that can close this start token or delimiter"
     },
+    "single": {
+      "type": "boolean",
+      "description": "True if token is followed by only a single expression"
+    }
     "precedence": {
       "type": "array",
       "items": { "type": "integer", "minimum": 0 },

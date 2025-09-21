@@ -76,13 +76,13 @@ var startTokens = map[string]StartTokenData{
 	},
 }
 
-// Label tokens (L) with their attributes
-type LabelTokenData struct {
+// Bridge tokens (B) with their attributes
+type BridgeTokenData struct {
 	Expecting []string
 	In        []string
 }
 
-var labelTokens = map[string]LabelTokenData{
+var bridgeTokens = map[string]BridgeTokenData{
 	"=>>": {
 		Expecting: []string{"do"},
 		In:        []string{},
@@ -99,15 +99,6 @@ var labelTokens = map[string]LabelTokenData{
 		Expecting: []string{},
 		In:        []string{"if", "try"},
 	},
-}
-
-// Compound tokens (C) with their attributes
-type CompoundTokenData struct {
-	Expecting []string
-	In        []string
-}
-
-var compoundTokens = map[string]CompoundTokenData{
 	"catch": {
 		Expecting: []string{"then", ":"},
 		In:        []string{"try"},
@@ -230,11 +221,11 @@ func (t *Tokenizer) getStartTokens() map[string]StartTokenData {
 	return startTokens
 }
 
-func (t *Tokenizer) getLabelTokens() map[string]LabelTokenData {
+func (t *Tokenizer) getBridgeTokens() map[string]BridgeTokenData {
 	if t.rules != nil {
-		return t.rules.LabelTokens
+		return t.rules.BridgeTokens
 	}
-	return labelTokens
+	return bridgeTokens
 }
 
 func (t *Tokenizer) getWildcardTokens() map[string]bool {
@@ -261,6 +252,12 @@ func (t *Tokenizer) pushExpecting(expected []string) {
 func (t *Tokenizer) popExpecting() {
 	if len(t.expectingStack) > 0 {
 		t.expectingStack = t.expectingStack[:len(t.expectingStack)-1]
+	}
+}
+
+func (t *Tokenizer) replaceExpecting(expected []string) {
+	if len(t.expectingStack) > 0 {
+		t.expectingStack[len(t.expectingStack)-1] = expected
 	}
 }
 
@@ -315,34 +312,25 @@ func (t *Tokenizer) addTokenAndManageStack(token *Token) error {
 	case EndToken:
 		// Pop the expecting stack
 		t.popExpecting()
-	case LabelToken, CompoundToken:
+	case BridgeToken:
 		// Update expecting for label and compound tokens based on their attributes
-		switch token.Text {
-		case "=>>":
-			// After =>> we expect do
-			t.pushExpecting([]string{"do"})
-		case "do":
-			// After do in "for x do" or "def f(x) =>> do", we expect end
-			t.popExpecting() // Remove the "do" expectation
-			t.pushExpecting([]string{"end"})
-		default:
-			// For other label/compound tokens, check if they have their own expectations
-			if labelData, exists := labelTokens[token.Text]; exists {
-				// Replace current expectations with what this label expects
-				if len(t.expectingStack) > 0 {
-					t.popExpecting() // Remove current expectations
-				}
-				if len(labelData.Expecting) > 0 {
-					t.pushExpecting(labelData.Expecting)
-				}
-				// If labelData.Expecting is empty, we leave the stack with nothing expected
-			} else if compoundData, exists := compoundTokens[token.Text]; exists {
-				// Handle compound tokens the same way
-				if len(t.expectingStack) > 0 {
-					t.popExpecting() // Remove current expectations
-				}
-				if len(compoundData.Expecting) > 0 {
-					t.pushExpecting(compoundData.Expecting)
+		if token.Expecting != nil {
+			// If the token has explicit expecting, replace current expectations
+			t.popExpecting() // Remove current expectations			}
+			t.pushExpecting(token.Expecting)
+		} else {
+			// For label/compound tokens without explicit expecting, use defaults.
+			switch token.Text {
+			case "=>>":
+				// After =>> we expect do
+				t.replaceExpecting([]string{"do"})
+			case "do":
+				// After do in "for x do" or "def f(x) =>> do", we expect end
+				t.replaceExpecting([]string{"end"})
+			default:
+				// For other label/compound tokens, check if they have their own expectations
+				if labelData, exists := bridgeTokens[token.Text]; exists {
+					t.replaceExpecting(labelData.Expecting)
 				}
 			}
 		}
@@ -397,59 +385,7 @@ func (t *Tokenizer) nextToken() error {
 		return t.addTokenAndManageStack(token)
 	}
 
-	if token := t.matchIdentifier(); token != nil {
-		token.Span.Start = start
-		if sawNewlineBefore {
-			token.LnBefore = &sawNewlineBefore
-		}
-		return t.addTokenAndManageStack(token)
-	}
-
-	// Only use default special labels matching if no custom label rules are defined
-	if t.rules == nil || len(t.rules.LabelTokens) == 0 {
-		if token := t.matchSpecialLabels(); token != nil {
-			token.Span.Start = start
-			if sawNewlineBefore {
-				token.LnBefore = &sawNewlineBefore
-			}
-			return t.addTokenAndManageStack(token)
-		}
-	}
-
-	// Only use default operator matching if no custom operator rules are defined
-	if t.rules == nil || len(t.rules.OperatorPrecedences) == 0 {
-		if token := t.matchOperator(); token != nil {
-			token.Span.Start = start
-			if sawNewlineBefore {
-				token.LnBefore = &sawNewlineBefore
-			}
-			return t.addTokenAndManageStack(token)
-		}
-	}
-
-	// Only use default delimiter matching if no custom bracket rules are defined
-	if t.rules == nil || len(t.rules.DelimiterMappings) == 0 {
-		if token := t.matchDelimiter(); token != nil {
-			token.Span.Start = start
-			if sawNewlineBefore {
-				token.LnBefore = &sawNewlineBefore
-			}
-			return t.addTokenAndManageStack(token)
-		}
-	}
-
-	// If nothing matches, create an unclassified token
-	r, size := utf8.DecodeRuneInString(t.input[t.position:])
-	text := string(r)
-	end := Position{Line: t.line, Col: t.column + size}
-	span := Span{Start: start, End: end}
-
-	token := NewToken(text, UnclassifiedToken, span)
-	if sawNewlineBefore {
-		token.LnBefore = &sawNewlineBefore
-	}
-	t.advance(size)
-	return t.addTokenAndManageStack(token)
+	return t.nextTokenDefault(start, sawNewlineBefore)
 }
 
 // skipWhitespaceAndComments advances past whitespace characters and comments.
@@ -710,128 +646,6 @@ func (t *Tokenizer) createExceptionToken(text, reason string) *Token {
 	return NewExceptionToken(text, reason, span)
 }
 
-// matchIdentifier attempts to match an identifier.
-func (t *Tokenizer) matchIdentifier() *Token {
-	match := identifierRegex.FindString(t.input[t.position:])
-	if match == "" {
-		return nil
-	}
-
-	end := Position{Line: t.line, Col: t.column + len(match)}
-	span := Span{End: end}
-
-	// Check if it's a start token (only if no custom start rules are defined)
-	if t.rules == nil || len(t.rules.StartTokens) == 0 {
-		if startData, isStart := startTokens[match]; isStart {
-			t.advance(len(match))
-			return NewStartToken(match, startData.Expecting, startData.ClosedBy, span)
-		}
-	}
-
-	// Check if it's an end token - only if no custom start rules are defined
-	if t.rules == nil || len(t.rules.StartTokens) == 0 {
-		if strings.HasPrefix(match, "end") {
-			t.advance(len(match))
-			return NewToken(match, EndToken, span)
-		}
-	}
-
-	// Check if it's a label token (L) - only if no custom label rules are defined
-	if t.rules == nil || len(t.rules.LabelTokens) == 0 {
-		if labelData, isLabel := labelTokens[match]; isLabel {
-			t.advance(len(match))
-			return NewLabelToken(match, labelData.Expecting, labelData.In, span)
-		}
-	}
-
-	// Check if it's a compound token (C) - only if no custom compound rules are defined
-	if t.rules == nil || len(t.rules.CompoundTokens) == 0 {
-		if compoundData, isCompound := compoundTokens[match]; isCompound {
-			t.advance(len(match))
-			return NewCompoundToken(match, compoundData.Expecting, compoundData.In, span)
-		}
-	}
-
-	// Default to VariableToken, but check for prefix tokens
-	var tokenType TokenType = VariableToken
-
-	// Check if it's a prefix token (P) - only if no custom prefix rules are defined
-	if t.rules == nil || len(t.rules.PrefixTokens) == 0 {
-		if prefixTokens[match] {
-			tokenType = PrefixToken
-		}
-	}
-	// Otherwise, default to VariableToken
-
-	t.advance(len(match))
-	return NewToken(match, tokenType, span)
-}
-
-// matchSpecialLabels attempts to match special label sequences like '=>>' and wildcard ':'
-func (t *Tokenizer) matchSpecialLabels() *Token {
-	// Check for '=>>' special label
-	if strings.HasPrefix(t.input[t.position:], "=>>") {
-		end := Position{Line: t.line, Col: t.column + 3}
-		span := Span{End: end}
-
-		labelData := labelTokens["=>>"]
-		t.advance(3)
-		return NewLabelToken("=>>", labelData.Expecting, labelData.In, span)
-	}
-
-	// Check for wildcard tokens
-	wildcardTokens := t.getWildcardTokens()
-	for wildcardText := range wildcardTokens {
-		if t.position < len(t.input) && strings.HasPrefix(t.input[t.position:], wildcardText) {
-			// For single character wildcards, make sure it's not part of a longer operator
-			if len(wildcardText) == 1 && wildcardText == ":" {
-				if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
-					continue // Skip this wildcard as it's part of a longer operator
-				}
-			}
-
-			end := Position{Line: t.line, Col: t.column + len(wildcardText)}
-			span := Span{End: end}
-
-			// Check if we have context from the expecting stack
-			expected := t.getCurrentlyExpected()
-			if len(expected) > 0 {
-				// Use the first expected token as the basis for the wildcard
-				expectedText := expected[0]
-
-				// Check if it's a label token
-				labelTokens := t.getLabelTokens()
-				if labelData, exists := labelTokens[expectedText]; exists {
-					// Create a wildcard token that copies attributes from the expected label
-					t.advance(len(wildcardText))
-					return NewWildcardLabelTokenWithAttributes(wildcardText, expectedText, labelData.Expecting, labelData.In, span)
-				}
-
-				// Check if it's a start token
-				startTokens := t.getStartTokens()
-				if startData, exists := startTokens[expectedText]; exists {
-					// Create wildcard start token
-					t.advance(len(wildcardText))
-					return NewWildcardStartToken(wildcardText, expectedText, startData.ClosedBy, span)
-				}
-
-				// Check if it's an end token (starts with "end")
-				if strings.HasPrefix(expectedText, "end") {
-					// Create wildcard end token
-					t.advance(len(wildcardText))
-					return NewWildcardEndToken(wildcardText, expectedText, span)
-				}
-			}
-
-			// No context available, create unclassified token
-			t.advance(len(wildcardText))
-			return NewToken(wildcardText, UnclassifiedToken, span)
-		}
-	}
-
-	return nil
-}
-
 // matchCustomRules checks for any custom rules that match at the current position.
 // Custom rules take precedence over default rules.
 func (t *Tokenizer) matchCustomRules() *Token {
@@ -883,10 +697,10 @@ func (t *Tokenizer) matchCustomRules() *Token {
 			expectedText := expected[0]
 
 			// Check if it's a label token
-			if labelData, exists := t.rules.LabelTokens[expectedText]; exists {
+			if bridgeData, exists := t.rules.BridgeTokens[expectedText]; exists {
 				// Create a wildcard token that copies attributes from the expected label
 				t.advance(len(text))
-				return NewWildcardLabelTokenWithAttributes(text, expectedText, labelData.Expecting, labelData.In, span)
+				return NewWildcardBridgeTokenWithAttributes(text, expectedText, bridgeData.Expecting, bridgeData.In, span)
 			}
 
 			// Check if it's a start token
@@ -917,15 +731,10 @@ func (t *Tokenizer) matchCustomRules() *Token {
 		t.advance(len(text))
 		return NewToken(text, EndToken, span)
 
-	case CustomLabel:
-		labelData := entry.Data.(LabelTokenData)
+	case CustomBridge:
+		labelData := entry.Data.(BridgeTokenData)
 		t.advance(len(text))
-		return NewLabelToken(text, labelData.Expecting, labelData.In, span)
-
-	case CustomCompound:
-		compoundData := entry.Data.(CompoundTokenData)
-		t.advance(len(text))
-		return NewCompoundToken(text, compoundData.Expecting, compoundData.In, span)
+		return NewStmntBridgeToken(text, labelData.Expecting, labelData.In, span)
 
 	case CustomPrefix:
 		t.advance(len(text))
@@ -948,89 +757,6 @@ func (t *Tokenizer) matchCustomRules() *Token {
 	case CustomCloseDelimiter:
 		t.advance(len(text))
 		return NewToken(text, CloseDelimiter, span)
-	}
-
-	return nil
-}
-
-// matchOperator attempts to match an operator.
-func (t *Tokenizer) matchOperator() *Token {
-	match := operatorRegex.FindString(t.input[t.position:])
-	if match == "" {
-		return nil
-	}
-
-	// Check if this might be a custom delimiter first (open delimiters)
-	delimMappings := t.getDelimiterMappings()
-	firstChar := string(match[0])
-	if _, isDelimiter := delimMappings[firstChar]; isDelimiter {
-		// Let delimiter matching handle this instead
-		return nil
-	}
-
-	// Check if this might be a closing delimiter
-	for _, closedByList := range delimMappings {
-		for _, closer := range closedByList {
-			if firstChar == closer {
-				// Let delimiter matching handle this instead
-				return nil
-			}
-		}
-	}
-
-	// Special case: single ':' is treated as a wildcard simple-label, not an operator
-	if match == ":" {
-		// This should be handled elsewhere as a label token
-		return nil
-	}
-
-	// Special case: '=>>' is treated as a simple-label, not an operator
-	if strings.HasPrefix(match, "=>>") {
-		// This should be handled elsewhere as a label token
-		return nil
-	}
-
-	// Use the entire match as the operator (greedy matching)
-	operator := match
-
-	end := Position{Line: t.line, Col: t.column + len(operator)}
-	span := Span{End: end}
-
-	// Calculate precedence using the new rules
-	prefix, infix, postfix := calculateOperatorPrecedence(operator)
-
-	t.advance(len(operator))
-	return NewOperatorToken(operator, prefix, infix, postfix, span)
-}
-
-// matchDelimiter attempts to match a delimiter using default rules only.
-// This is only called when no custom bracket rules are defined.
-func (t *Tokenizer) matchDelimiter() *Token {
-	if t.position >= len(t.input) {
-		return nil
-	}
-
-	char := string(t.input[t.position])
-
-	// Check for open delimiters using default mappings
-	if closedBy, isOpen := delimiterMappings[char]; isOpen {
-		end := Position{Line: t.line, Col: t.column + 1}
-		span := Span{End: end}
-
-		props := delimiterProperties[char]
-		isInfix, isPrefix := props[0], props[1]
-
-		t.advance(1)
-		return NewDelimiterToken(char, closedBy, isInfix, isPrefix, span)
-	}
-
-	// Check for close delimiters using default regex
-	if closeDelimRegex.MatchString(char) {
-		end := Position{Line: t.line, Col: t.column + 1}
-		span := Span{End: end}
-
-		t.advance(1)
-		return NewToken(char, CloseDelimiter, span)
 	}
 
 	return nil

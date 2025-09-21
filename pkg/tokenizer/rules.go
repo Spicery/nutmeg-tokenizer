@@ -12,8 +12,7 @@ type RulesFile struct {
 	Bracket  []BracketRule  `yaml:"bracket"`
 	Prefix   []PrefixRule   `yaml:"prefix"`
 	Start    []StartRule    `yaml:"start"`
-	Label    []LabelRule    `yaml:"label"`
-	Compound []CompoundRule `yaml:"compound"`
+	Bridge   []BridgeRule   `yaml:"bridge"`
 	Wildcard []WildcardRule `yaml:"wildcard"`
 	Operator []OperatorRule `yaml:"operator"`
 }
@@ -38,8 +37,8 @@ type StartRule struct {
 	Expecting []string `yaml:"expecting"`
 }
 
-// LabelRule represents a label token rule
-type LabelRule struct {
+// BridgeRule represents a bridge token rule
+type BridgeRule struct {
 	Text      string   `yaml:"text"`
 	Expecting []string `yaml:"expecting"`
 	In        []string `yaml:"in"`
@@ -70,8 +69,7 @@ const (
 	CustomWildcard CustomRuleType = iota
 	CustomStart
 	CustomEnd
-	CustomLabel
-	CustomCompound
+	CustomBridge
 	CustomPrefix
 	CustomOperator
 	CustomOpenDelimiter
@@ -87,8 +85,7 @@ type CustomRuleEntry struct {
 // TokenizerRules holds all the rule maps that can be customized
 type TokenizerRules struct {
 	StartTokens         map[string]StartTokenData
-	LabelTokens         map[string]LabelTokenData
-	CompoundTokens      map[string]CompoundTokenData
+	BridgeTokens        map[string]BridgeTokenData
 	PrefixTokens        map[string]bool
 	DelimiterMappings   map[string][]string
 	DelimiterProperties map[string][2]bool
@@ -103,8 +100,7 @@ type TokenizerRules struct {
 func DefaultRules() *TokenizerRules {
 	rules := &TokenizerRules{
 		StartTokens:         getDefaultStartTokens(),
-		LabelTokens:         getDefaultLabelTokens(),
-		CompoundTokens:      getDefaultCompoundTokens(),
+		BridgeTokens:        getDefaultBridgeTokens(),
 		PrefixTokens:        getDefaultPrefixTokens(),
 		DelimiterMappings:   getDefaultDelimiterMappings(),
 		DelimiterProperties: getDefaultDelimiterProperties(),
@@ -171,22 +167,11 @@ func ApplyRulesToDefaults(rules *RulesFile) (*TokenizerRules, error) {
 		}
 	}
 
-	// Apply label rules
-	if len(rules.Label) > 0 {
-		tokenizerRules.LabelTokens = make(map[string]LabelTokenData)
-		for _, rule := range rules.Label {
-			tokenizerRules.LabelTokens[rule.Text] = LabelTokenData{
-				Expecting: rule.Expecting,
-				In:        rule.In,
-			}
-		}
-	}
-
-	// Apply compound rules
-	if len(rules.Compound) > 0 {
-		tokenizerRules.CompoundTokens = make(map[string]CompoundTokenData)
-		for _, rule := range rules.Compound {
-			tokenizerRules.CompoundTokens[rule.Text] = CompoundTokenData{
+	// Apply bridge rules
+	if len(rules.Bridge) > 0 {
+		tokenizerRules.BridgeTokens = make(map[string]BridgeTokenData)
+		for _, rule := range rules.Bridge {
+			tokenizerRules.BridgeTokens[rule.Text] = BridgeTokenData{
 				Expecting: rule.Expecting,
 				In:        rule.In,
 			}
@@ -254,8 +239,8 @@ func getDefaultStartTokens() map[string]StartTokenData {
 	}
 }
 
-func getDefaultLabelTokens() map[string]LabelTokenData {
-	return map[string]LabelTokenData{
+func getDefaultBridgeTokens() map[string]BridgeTokenData {
+	return map[string]BridgeTokenData{
 		"=>>": {
 			Expecting: []string{"do"},
 			In:        []string{"def"},
@@ -275,19 +260,6 @@ func getDefaultLabelTokens() map[string]LabelTokenData {
 		"catch": {
 			Expecting: []string{},
 			In:        []string{"try"},
-		},
-	}
-}
-
-func getDefaultCompoundTokens() map[string]CompoundTokenData {
-	return map[string]CompoundTokenData{
-		"elseif": {
-			Expecting: []string{"then"},
-			In:        []string{"if"},
-		},
-		"elseifnot": {
-			Expecting: []string{"then"},
-			In:        []string{"if"},
 		},
 	}
 }
@@ -354,16 +326,9 @@ func (rules *TokenizerRules) BuildTokenLookup() error {
 		}
 	}
 
-	// Add label tokens
-	for token, data := range rules.LabelTokens {
-		if err := addToken(token, CustomLabel, "label", data); err != nil {
-			return err
-		}
-	}
-
-	// Add compound tokens
-	for token, data := range rules.CompoundTokens {
-		if err := addToken(token, CustomCompound, "compound", data); err != nil {
+	// Add bridge tokens
+	for token, data := range rules.BridgeTokens {
+		if err := addToken(token, CustomBridge, "bridge", data); err != nil {
 			return err
 		}
 	}
