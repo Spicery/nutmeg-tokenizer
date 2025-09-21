@@ -693,7 +693,7 @@ func (t *Tokenizer) matchCustomRules() *Token {
 			if bridgeData, exists := t.rules.BridgeTokens[expectedText]; exists {
 				// Create a wildcard token that copies attributes from the expected label
 				t.advance(len(text))
-				return NewWildcardBridgeTokenWithAttributes(text, expectedText, bridgeData.Expecting, bridgeData.In, span)
+				return NewWildcardBridgeToken(text, expectedText, bridgeData.Expecting, bridgeData.In, span)
 			}
 		}
 

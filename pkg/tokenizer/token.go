@@ -173,27 +173,6 @@ func NewStartToken(text string, expecting, closedBy []string, span Span) *Token 
 	}
 }
 
-// // NewWildcardStartToken creates a wildcard start token with copied attributes.
-// func NewWildcardStartToken(text, expectedText string, closedBy []string, span Span) *Token {
-// 	return &Token{
-// 		Text:     text,
-// 		Type:     StartToken,
-// 		Span:     span,
-// 		ClosedBy: closedBy,
-// 		Alias:    &expectedText,
-// 	}
-// }
-
-// NewWildcardEndToken creates a wildcard end token.
-func NewWildcardEndToken(text, expectedText string, span Span) *Token {
-	return &Token{
-		Text:  text,
-		Type:  EndToken,
-		Span:  span,
-		Alias: &expectedText,
-	}
-}
-
 // NewOperatorToken creates a new operator token with precedence values.
 func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token {
 	token := &Token{
@@ -225,20 +204,15 @@ func NewDelimiterToken(text string, closedBy []string, isInfix, isPrefix bool, s
 
 // NewStmntBridgeToken creates a new label token with expecting and in attributes.
 func NewStmntBridgeToken(text string, expecting, in []string, span Span) *Token {
-	single := false
-	return &Token{
-		Text:      text,
-		Type:      BridgeToken,
-		Span:      span,
-		Expecting: expecting,
-		In:        in,
-		Single:    &single,
-	}
+	return NewBridgeToken(text, expecting, in, false, span)
 }
 
 // NewExprBridgeToken creates a new compound token with expecting and in attributes.
 func NewExprBridgeToken(text string, expecting, in []string, span Span) *Token {
-	single := true
+	return NewBridgeToken(text, expecting, in, true, span)
+}
+
+func NewBridgeToken(text string, expecting, in []string, single bool, span Span) *Token {
 	return &Token{
 		Text:      text,
 		Type:      BridgeToken,
@@ -249,19 +223,8 @@ func NewExprBridgeToken(text string, expecting, in []string, span Span) *Token {
 	}
 }
 
-// NewWildcardBridgeToken creates a new wildcard label token.
-func NewWildcardBridgeToken(text string, span Span) *Token {
-	value := ""
-	return &Token{
-		Text:  text,
-		Type:  BridgeToken,
-		Span:  span,
-		Alias: &value,
-	}
-}
-
-// NewWildcardBridgeTokenWithAttributes creates a wildcard label token with copied attributes.
-func NewWildcardBridgeTokenWithAttributes(text, expectedText string, expecting, in []string, span Span) *Token {
+// NewWildcardBridgeToken creates a wildcard label token with copied attributes.
+func NewWildcardBridgeToken(text, expectedText string, expecting, in []string, span Span) *Token {
 	return &Token{
 		Text:      text,
 		Type:      BridgeToken,

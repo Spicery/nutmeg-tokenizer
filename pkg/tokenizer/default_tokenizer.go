@@ -199,7 +199,7 @@ func (t *Tokenizer) matchOperator() *Token {
 			expectedText := expected[0] // Use the leading token only.
 			labelTokens := t.getBridgeTokens()
 			if labelData, exists := labelTokens[expectedText]; exists {
-				return NewWildcardBridgeTokenWithAttributes(match, expectedText, labelData.Expecting, labelData.In, span)
+				return NewWildcardBridgeToken(match, expectedText, labelData.Expecting, labelData.In, span)
 			}
 		}
 		return NewUnclassifiedToken(match, span)
