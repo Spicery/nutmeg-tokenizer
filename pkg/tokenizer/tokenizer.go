@@ -24,56 +24,15 @@ type Tokenizer struct {
 var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
 	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
-	closeDelimRegex = regexp.MustCompile(`^[\)\]\}]`)
-	// numericRegex    = regexp.MustCompile(`^(?:\d+[xobt][0-9A-Z]+(?:_[0-9A-Z]+)*|\d+r[0-9A-Z]+(?:_[0-9A-Z]+)*|\d+(?:_\d+)*)(?:\.[0-9A-Z01T]*(?:_[0-9A-Z01T]+)*)?(?:e[+-]?\d+)?`)
-	radixRegex   = regexp.MustCompile(`^(\d+[xobtr])([0-9A-Z]+(?:_[0-9A-Z]+)*)(\.[0-9A-Z]*(?:_[0-9A-Z]+)*)?(?:e([+-]?\d+))?`)
-	decimalRegex = regexp.MustCompile(`^(\d+(?:_\d+)*)(\.\d*(?:_\d+)*)?(?:e([+-]?\d+))?`)
-	commentRegex = regexp.MustCompile(`^###.*`)
+	radixRegex      = regexp.MustCompile(`^(\d+[xobtr])([0-9A-Z]+(?:_[0-9A-Z]+)*)(\.[0-9A-Z]*(?:_[0-9A-Z]+)*)?(?:e([+-]?\d+))?`)
+	decimalRegex    = regexp.MustCompile(`^(\d+(?:_\d+)*)(\.\d*(?:_\d+)*)?(?:e([+-]?\d+))?`)
+	commentRegex    = regexp.MustCompile(`^###.*`)
 )
 
 // Start token mappings with expecting and closed_by information
 type StartTokenData struct {
 	Expecting []string
 	ClosedBy  []string
-}
-
-var startTokens = map[string]StartTokenData{
-	"def": {
-		Expecting: []string{"=>>"},
-		ClosedBy:  []string{"end", "enddef"},
-	},
-	"if": {
-		Expecting: []string{"then"},
-		ClosedBy:  []string{"end", "endif"},
-	},
-	"ifnot": {
-		Expecting: []string{"then"},
-		ClosedBy:  []string{"end", "endifnot"},
-	},
-	"fn": {
-		Expecting: []string{},
-		ClosedBy:  []string{"end", "endfn"},
-	},
-	"for": {
-		Expecting: []string{"do"},
-		ClosedBy:  []string{"end", "endfor"},
-	},
-	"class": {
-		Expecting: []string{},
-		ClosedBy:  []string{"end", "endclass"},
-	},
-	"interface": {
-		Expecting: []string{},
-		ClosedBy:  []string{"end", "endinterface"},
-	},
-	"try": {
-		Expecting: []string{"catch", "else"},
-		ClosedBy:  []string{"end", "endtry"},
-	},
-	"transaction": {
-		Expecting: []string{"else"},
-		ClosedBy:  []string{"end", "endtransaction"},
-	},
 }
 
 // Bridge tokens (B) with their attributes
@@ -113,12 +72,6 @@ var bridgeTokens = map[string]BridgeTokenData{
 	},
 }
 
-// Prefix tokens (P)
-var prefixTokens = map[string]bool{
-	"return": true,
-	"yield":  true,
-}
-
 // Base precedence values for operator characters (from operators.md)
 var baseOperatorPrecedence = map[rune]int{
 	'*': 10,
@@ -138,20 +91,6 @@ var baseOperatorPrecedence = map[rune]int{
 	':': 150,
 }
 
-// // Delimiter mappings
-// var delimiterMappings = map[string][]string{
-// 	"(": {")"},
-// 	"[": {"]"},
-// 	"{": {"}"},
-// }
-
-// // Delimiter properties
-// var delimiterProperties = map[string][2]bool{
-// 	"(": {true, true},  // infix=true, prefix=true
-// 	"[": {true, false}, // infix=true, prefix=false
-// 	"{": {true, true},  // infix=false, prefix=true
-// }
-
 // NewTokenizer creates a new tokenizer instance with default rules.
 func NewTokenizer(input string) *Tokenizer {
 	return NewTokenizerWithRules(input, DefaultRules())
@@ -170,13 +109,6 @@ func NewTokenizerWithRules(input string, rules *TokenizerRules) *Tokenizer {
 }
 
 // Helper methods to access rules with fallback to global variables
-
-func (t *Tokenizer) getBridgeTokens() map[string]BridgeTokenData {
-	if t.rules != nil {
-		return t.rules.BridgeTokens
-	}
-	return bridgeTokens
-}
 
 // pushExpecting pushes a new set of expected tokens onto the stack.
 func (t *Tokenizer) pushExpecting(expected []string) {
@@ -710,53 +642,4 @@ func (t *Tokenizer) advance(n int) {
 		}
 		t.position++
 	}
-}
-
-// matchIdentifier attempts to match an identifier.
-func (t *Tokenizer) matchIdentifier() *Token {
-	match := identifierRegex.FindString(t.input[t.position:])
-	if match == "" {
-		return nil
-	}
-
-	end := Position{Line: t.line, Col: t.column + len(match)}
-	span := Span{End: end}
-
-	// Check if it's a start token (only if no custom start rules are defined)
-	if t.rules == nil || len(t.rules.StartTokens) == 0 {
-		if startData, isStart := startTokens[match]; isStart {
-			t.advance(len(match))
-			return NewStartToken(match, startData.Expecting, startData.ClosedBy, span)
-		}
-	}
-
-	// Check if it's an end token - only if no custom start rules are defined
-	if t.rules == nil || len(t.rules.StartTokens) == 0 {
-		if strings.HasPrefix(match, "end") {
-			t.advance(len(match))
-			return NewToken(match, EndToken, span)
-		}
-	}
-
-	// Check if it's a bridge token (B) - only if no custom bridge rules are defined
-	if t.rules == nil || len(t.rules.BridgeTokens) == 0 {
-		if labelData, isLabel := bridgeTokens[match]; isLabel {
-			t.advance(len(match))
-			return NewStmntBridgeToken(match, labelData.Expecting, labelData.In, span)
-		}
-	}
-
-	// Default to VariableToken, but check for prefix tokens
-	var tokenType TokenType = VariableToken
-
-	// Check if it's a prefix token (P) - only if no custom prefix rules are defined
-	if t.rules == nil || len(t.rules.PrefixTokens) == 0 {
-		if prefixTokens[match] {
-			tokenType = PrefixToken
-		}
-	}
-	// Otherwise, default to VariableToken
-
-	t.advance(len(match))
-	return NewToken(match, tokenType, span)
 }
