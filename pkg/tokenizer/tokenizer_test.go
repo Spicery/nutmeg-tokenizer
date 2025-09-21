@@ -538,7 +538,7 @@ func TestStartTokens(t *testing.T) {
 		{"fn", StartToken, []string{}},
 		{"for", StartToken, []string{"do"}},
 		{"try", StartToken, []string{"catch", "else"}},
-		{"transaction", StartToken, []string{"else"}},
+		{"transaction", StartToken, []string{"catch", "else"}},
 	}
 
 	for _, tt := range tests {
@@ -797,15 +797,8 @@ world`
 
 func TestCustomRulesWildcard(t *testing.T) {
 	// Create a custom rules set with a different wildcard
-	rules := &TokenizerRules{
-		StartTokens:         getDefaultStartTokens(),
-		BridgeTokens:        getDefaultBridgeTokens(),
-		PrefixTokens:        getDefaultPrefixTokens(),
-		DelimiterMappings:   getDefaultDelimiterMappings(),
-		DelimiterProperties: getDefaultDelimiterProperties(),
-		WildcardTokens:      map[string]bool{"*": true}, // Use * instead of :
-		OperatorPrecedences: make(map[string][3]int),
-	}
+	rules := DefaultRules()
+	rules.WildcardTokens = map[string]bool{"***": true} // Use '*' as wildcard instead of ':'
 
 	// Build the precomputed lookup map
 	if err := rules.BuildTokenLookup(); err != nil {
@@ -813,7 +806,7 @@ func TestCustomRulesWildcard(t *testing.T) {
 	}
 
 	// Test with custom wildcard in a def context
-	tokenizer := NewTokenizerWithRules("def foo *", rules)
+	tokenizer := NewTokenizerWithRules("def foo ***", rules)
 	tokens, err := tokenizer.Tokenize()
 
 	if err != nil {
@@ -826,8 +819,8 @@ func TestCustomRulesWildcard(t *testing.T) {
 
 	// Third token should be a wildcard token behaving like "=>>"
 	wildcardToken := tokens[2]
-	if wildcardToken.Text != "*" {
-		t.Errorf("Expected wildcard token text to be '*', got '%s'", wildcardToken.Text)
+	if wildcardToken.Text != "***" {
+		t.Errorf("Expected wildcard token text to be '***', got '%s'", wildcardToken.Text)
 	}
 
 	if wildcardToken.Type != BridgeToken {

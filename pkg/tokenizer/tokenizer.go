@@ -138,66 +138,23 @@ var baseOperatorPrecedence = map[rune]int{
 	':': 150,
 }
 
-// calculateOperatorPrecedence calculates precedence based on rules in operators.md
-func calculateOperatorPrecedence(operator string) (prefix, infix, postfix int) {
-	if len(operator) == 0 {
-		return 0, 0, 0
-	}
+// // Delimiter mappings
+// var delimiterMappings = map[string][]string{
+// 	"(": {")"},
+// 	"[": {"]"},
+// 	"{": {"}"},
+// }
 
-	firstChar := rune(operator[0])
-	basePrecedence, exists := baseOperatorPrecedence[firstChar]
-	if !exists {
-		// Fallback for unknown operators
-		basePrecedence = 1000
-	}
-
-	// If the first character is repeated, subtract 1
-	if len(operator) > 1 && rune(operator[1]) == firstChar {
-		basePrecedence--
-	}
-
-	// Role adjustments as per updated operators.md:
-	// - Only minus ("-") has prefix capability enabled (unary negation)
-	// - All operators have infix capability (add 2000 to base precedence)
-	// - No operators have postfix capability (set to 0)
-
-	if operator == "-" {
-		// Unary minus: enabled for both prefix and infix
-		prefix = basePrecedence
-		infix = basePrecedence + 2000
-		postfix = 0
-	} else {
-		// All other operators: only infix enabled
-		prefix = 0
-		infix = basePrecedence + 2000
-		postfix = 0
-	}
-
-	return prefix, infix, postfix
-} // Delimiter mappings
-var delimiterMappings = map[string][]string{
-	"(": {")"},
-	"[": {"]"},
-	"{": {"}"},
-}
-
-// Delimiter properties
-var delimiterProperties = map[string][2]bool{
-	"(": {true, true},  // infix=true, prefix=true
-	"[": {true, false}, // infix=true, prefix=false
-	"{": {true, true},  // infix=false, prefix=true
-}
+// // Delimiter properties
+// var delimiterProperties = map[string][2]bool{
+// 	"(": {true, true},  // infix=true, prefix=true
+// 	"[": {true, false}, // infix=true, prefix=false
+// 	"{": {true, true},  // infix=false, prefix=true
+// }
 
 // NewTokenizer creates a new tokenizer instance with default rules.
 func NewTokenizer(input string) *Tokenizer {
-	return &Tokenizer{
-		input:          input,
-		line:           1,
-		column:         1,
-		tokens:         make([]*Token, 0),
-		expectingStack: make([][]string, 0),
-		rules:          nil, // Use global variables for backward compatibility
-	}
+	return NewTokenizerWithRules(input, DefaultRules())
 }
 
 // NewTokenizerWithRules creates a new tokenizer instance with custom rules.
@@ -214,34 +171,12 @@ func NewTokenizerWithRules(input string, rules *TokenizerRules) *Tokenizer {
 
 // Helper methods to access rules with fallback to global variables
 
-// func (t *Tokenizer) getStartTokens() map[string]StartTokenData {
-// 	if t.rules != nil {
-// 		return t.rules.StartTokens
-// 	}
-// 	return startTokens
-// }
-
 func (t *Tokenizer) getBridgeTokens() map[string]BridgeTokenData {
 	if t.rules != nil {
 		return t.rules.BridgeTokens
 	}
 	return bridgeTokens
 }
-
-// func (t *Tokenizer) getWildcardTokens() map[string]bool {
-// 	if t.rules != nil {
-// 		return t.rules.WildcardTokens
-// 	}
-// 	// Default wildcard is just ":"
-// 	return map[string]bool{":": true}
-// }
-
-// func (t *Tokenizer) getDelimiterMappings() map[string][]string {
-// 	if t.rules != nil {
-// 		return t.rules.DelimiterMappings
-// 	}
-// 	return delimiterMappings
-// }
 
 // pushExpecting pushes a new set of expected tokens onto the stack.
 func (t *Tokenizer) pushExpecting(expected []string) {
@@ -385,7 +320,26 @@ func (t *Tokenizer) nextToken() error {
 		return t.addTokenAndManageStack(token)
 	}
 
-	return t.nextTokenDefault(start, sawNewlineBefore)
+	if token := t.matchIdentifier(); token != nil {
+		token.Span.Start = start
+		if sawNewlineBefore {
+			token.LnBefore = &sawNewlineBefore
+		}
+		return t.addTokenAndManageStack(token)
+	}
+
+	// If nothing matches, create an unclassified token
+	r, size := utf8.DecodeRuneInString(t.input[t.position:])
+	text := string(r)
+	end := Position{Line: t.line, Col: t.column + size}
+	span := Span{Start: start, End: end}
+
+	token := NewToken(text, UnclassifiedToken, span)
+	if sawNewlineBefore {
+		token.LnBefore = &sawNewlineBefore
+	}
+	t.advance(size)
+	return t.addTokenAndManageStack(token)
 }
 
 // skipWhitespaceAndComments advances past whitespace characters and comments.

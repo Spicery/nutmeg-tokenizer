@@ -105,7 +105,7 @@ func DefaultRules() *TokenizerRules {
 		DelimiterMappings:   getDefaultDelimiterMappings(),
 		DelimiterProperties: getDefaultDelimiterProperties(),
 		WildcardTokens:      getDefaultWildcardTokens(),
-		OperatorPrecedences: make(map[string][3]int),
+		OperatorPrecedences: getDefaultOperatorPrecedences(),
 	}
 
 	// Build the precomputed lookup map
@@ -202,6 +202,23 @@ func ApplyRulesToDefaults(rules *RulesFile) (*TokenizerRules, error) {
 }
 
 // Helper functions to get default values (these will copy from the existing global variables)
+
+func getDefaultOperatorPrecedences() map[string][3]int {
+	m := make(map[string][3]int)
+	updateOperatorPrecedence(m, ".")
+	updateOperatorPrecedence(m, "*")
+	updateOperatorPrecedence(m, "/")
+	updateOperatorPrecedence(m, "+")
+	updateOperatorPrecedence(m, "-")
+	updateOperatorPrecedence(m, "<")
+	updateOperatorPrecedence(m, ">")
+	updateOperatorPrecedence(m, "<=")
+	updateOperatorPrecedence(m, ">=")
+	updateOperatorPrecedence(m, "==")
+	updateOperatorPrecedence(m, ":=")
+	return m
+}
+
 func getDefaultStartTokens() map[string]StartTokenData {
 	return map[string]StartTokenData{
 		"def": {
@@ -229,11 +246,11 @@ func getDefaultStartTokens() map[string]StartTokenData {
 			ClosedBy:  []string{"end", "endfor"},
 		},
 		"try": {
-			Expecting: []string{"catch"},
+			Expecting: []string{"catch", "else"},
 			ClosedBy:  []string{"end", "endtry"},
 		},
 		"transaction": {
-			Expecting: []string{},
+			Expecting: []string{"catch", "else"},
 			ClosedBy:  []string{"end", "endtransaction"},
 		},
 	}
@@ -250,7 +267,15 @@ func getDefaultBridgeTokens() map[string]BridgeTokenData {
 			In:        []string{"def", "for"},
 		},
 		"then": {
-			Expecting: []string{},
+			Expecting: []string{"elseif", "else"},
+			In:        []string{"if", "ifnot"},
+		},
+		"elseif": {
+			Expecting: []string{"then"},
+			In:        []string{"if", "ifnot"},
+		},
+		"elseifnot": {
+			Expecting: []string{"then"},
 			In:        []string{"if", "ifnot"},
 		},
 		"else": {
@@ -397,4 +422,47 @@ func (rules *TokenizerRules) BuildTokenLookup() error {
 	}
 
 	return nil
+}
+
+func updateOperatorPrecedence(m map[string][3]int, operator string) {
+	prefix, infix, postfix := calculateOperatorPrecedence(operator)
+	m[operator] = [3]int{prefix, infix, postfix}
+}
+
+// calculateOperatorPrecedence calculates precedence based on rules in operators.md
+func calculateOperatorPrecedence(operator string) (prefix, infix, postfix int) {
+	if len(operator) == 0 {
+		return 0, 0, 0
+	}
+
+	firstChar := rune(operator[0])
+	basePrecedence, exists := baseOperatorPrecedence[firstChar]
+	if !exists {
+		// Fallback for unknown operators
+		basePrecedence = 1000
+	}
+
+	// If the first character is repeated, subtract 1
+	if len(operator) > 1 && rune(operator[1]) == firstChar {
+		basePrecedence--
+	}
+
+	// Role adjustments as per updated operators.md:
+	// - Only minus ("-") has prefix capability enabled (unary negation)
+	// - All operators have infix capability (add 2000 to base precedence)
+	// - No operators have postfix capability (set to 0)
+
+	if operator == "-" {
+		// Unary minus: enabled for both prefix and infix
+		prefix = basePrecedence
+		infix = basePrecedence + 2000
+		postfix = 0
+	} else {
+		// All other operators: only infix enabled
+		prefix = 0
+		infix = basePrecedence + 2000
+		postfix = 0
+	}
+
+	return prefix, infix, postfix
 }

@@ -1,62 +1,52 @@
 package tokenizer
 
 import (
-	"fmt"
 	"strings"
-	"unicode/utf8"
 )
 
 // nextTokenDefault tries to match the next token using the default token matching rules.
 // It is used when no custom rules are defined, or when no custom rule matches the input.
 // It returns a non-nil error if tokenization fails.
 
-func (t *Tokenizer) nextTokenDefault(start Position, sawNewlineBefore bool) error {
+// func (t *Tokenizer) nextTokenDefault(start Position, sawNewlineBefore bool) error {
 
-	if token := t.matchIdentifier(); token != nil {
-		token.Span.Start = start
-		if sawNewlineBefore {
-			token.LnBefore = &sawNewlineBefore
-		}
-		return t.addTokenAndManageStack(token)
-	}
+// 	if token := t.matchIdentifier(); token != nil {
+// 		token.Span.Start = start
+// 		if sawNewlineBefore {
+// 			token.LnBefore = &sawNewlineBefore
+// 		}
+// 		return t.addTokenAndManageStack(token)
+// 	}
 
-	// if token := t.matchSpecialLabels(); token != nil {
-	// 	token.Span.Start = start
-	// 	if sawNewlineBefore {
-	// 		token.LnBefore = &sawNewlineBefore
-	// 	}
-	// 	return t.addTokenAndManageStack(token)
-	// }
+// 	if token := t.matchOperator(); token != nil {
+// 		token.Span.Start = start
+// 		if sawNewlineBefore {
+// 			token.LnBefore = &sawNewlineBefore
+// 		}
+// 		return t.addTokenAndManageStack(token)
+// 	}
 
-	if token := t.matchOperator(); token != nil {
-		token.Span.Start = start
-		if sawNewlineBefore {
-			token.LnBefore = &sawNewlineBefore
-		}
-		return t.addTokenAndManageStack(token)
-	}
+// 	if token := t.matchDelimiter(); token != nil {
+// 		token.Span.Start = start
+// 		if sawNewlineBefore {
+// 			token.LnBefore = &sawNewlineBefore
+// 		}
+// 		return t.addTokenAndManageStack(token)
+// 	}
 
-	if token := t.matchDelimiter(); token != nil {
-		token.Span.Start = start
-		if sawNewlineBefore {
-			token.LnBefore = &sawNewlineBefore
-		}
-		return t.addTokenAndManageStack(token)
-	}
+// 	// If nothing matches, create an unclassified token
+// 	r, size := utf8.DecodeRuneInString(t.input[t.position:])
+// 	text := string(r)
+// 	end := Position{Line: t.line, Col: t.column + size}
+// 	span := Span{Start: start, End: end}
 
-	// If nothing matches, create an unclassified token
-	r, size := utf8.DecodeRuneInString(t.input[t.position:])
-	text := string(r)
-	end := Position{Line: t.line, Col: t.column + size}
-	span := Span{Start: start, End: end}
-
-	token := NewToken(text, UnclassifiedToken, span)
-	if sawNewlineBefore {
-		token.LnBefore = &sawNewlineBefore
-	}
-	t.advance(size)
-	return t.addTokenAndManageStack(token)
-}
+// 	token := NewToken(text, UnclassifiedToken, span)
+// 	if sawNewlineBefore {
+// 		token.LnBefore = &sawNewlineBefore
+// 	}
+// 	t.advance(size)
+// 	return t.addTokenAndManageStack(token)
+// }
 
 // matchIdentifier attempts to match an identifier.
 func (t *Tokenizer) matchIdentifier() *Token {
@@ -174,14 +164,14 @@ func (t *Tokenizer) matchIdentifier() *Token {
 
 // matchOperator attempts to match an operator.
 func (t *Tokenizer) matchOperator() *Token {
-	fmt.Println("matchOperator called at position", t.position, "input:", t.input[t.position:])
+	// fmt.Println("matchOperator called at position", t.position, "input:", t.input[t.position:])
 
 	match := operatorRegex.FindString(t.input[t.position:])
 	if match == "" {
 		return nil
 	}
 
-	fmt.Println("Operator matched:", match)
+	// fmt.Println("Operator matched:", match)
 
 	end := Position{Line: t.line, Col: t.column + len(match)}
 	span := Span{End: end}
@@ -214,33 +204,33 @@ func (t *Tokenizer) matchOperator() *Token {
 
 // matchDelimiter attempts to match a delimiter using default rules only.
 // This is only called when no custom bracket rules are defined.
-func (t *Tokenizer) matchDelimiter() *Token {
-	if t.position >= len(t.input) {
-		return nil
-	}
+// func (t *Tokenizer) matchDelimiter() *Token {
+// 	if t.position >= len(t.input) {
+// 		return nil
+// 	}
 
-	char := string(t.input[t.position])
+// 	char := string(t.input[t.position])
 
-	// Check for open delimiters using default mappings
-	if closedBy, isOpen := delimiterMappings[char]; isOpen {
-		end := Position{Line: t.line, Col: t.column + 1}
-		span := Span{End: end}
+// 	// Check for open delimiters using default mappings
+// 	if closedBy, isOpen := delimiterMappings[char]; isOpen {
+// 		end := Position{Line: t.line, Col: t.column + 1}
+// 		span := Span{End: end}
 
-		props := delimiterProperties[char]
-		isInfix, isPrefix := props[0], props[1]
+// 		props := delimiterProperties[char]
+// 		isInfix, isPrefix := props[0], props[1]
 
-		t.advance(1)
-		return NewDelimiterToken(char, closedBy, isInfix, isPrefix, span)
-	}
+// 		t.advance(1)
+// 		return NewDelimiterToken(char, closedBy, isInfix, isPrefix, span)
+// 	}
 
-	// Check for close delimiters using default regex
-	if closeDelimRegex.MatchString(char) {
-		end := Position{Line: t.line, Col: t.column + 1}
-		span := Span{End: end}
+// 	// Check for close delimiters using default regex
+// 	if closeDelimRegex.MatchString(char) {
+// 		end := Position{Line: t.line, Col: t.column + 1}
+// 		span := Span{End: end}
 
-		t.advance(1)
-		return NewToken(char, CloseDelimiter, span)
-	}
+// 		t.advance(1)
+// 		return NewToken(char, CloseDelimiter, span)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
