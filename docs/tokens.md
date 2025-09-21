@@ -63,7 +63,7 @@ The `span` field is serialized as a 4-element array `[start_line, start_col, end
   "base": 16,           // Numeric base (2-36)
   "mantissa": "1A",     // Mantissa part
   "fraction": "5",      // Fraction part (optional)
-  "exponent": "3",      // Exponent part (optional, decimal integer)
+  "exponent": 3,        // Exponent part (optional, decimal integer)
   "balanced": true      // For balanced ternary numbers (optional)
 }
 ```
@@ -211,7 +211,7 @@ The following JSON schema defines the structure of all tokens:
       "description": "Fraction part of numeric literals"
     },
     "exponent": {
-      "type": "string",
+      "type": "integer",
       "description": "Exponent part of numeric literals as a decimal integer"
     },
     "balanced": {

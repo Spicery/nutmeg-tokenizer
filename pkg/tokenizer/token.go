@@ -73,7 +73,7 @@ type Token struct {
 	Base     *int    `json:"base,omitempty"`  // Numeric base (e.g., 16, 2, 3, 10)
 	Mantissa *string `json:"mantissa,omitempty"`
 	Fraction *string `json:"fraction,omitempty"`
-	Exponent *string `json:"exponent,omitempty"`
+	Exponent *int    `json:"exponent,omitempty"`
 	Balanced *bool   `json:"balanced,omitempty"` // For balanced ternary numbers
 
 	// Start token, Label token, and Compound token fields
@@ -116,7 +116,7 @@ func NewStringToken(text, value string, span Span) *Token {
 }
 
 // NewNumericToken creates a new numeric token with radix and components.
-func NewNumericToken(text string, radix string, base int, mantissa, fraction, exponent string, span Span) *Token {
+func NewNumericToken(text string, radix string, base int, mantissa, fraction string, exponent int, span Span) *Token {
 	token := &Token{
 		Text:     text,
 		Type:     NumericLiteral,
@@ -129,7 +129,7 @@ func NewNumericToken(text string, radix string, base int, mantissa, fraction, ex
 	if fraction != "" {
 		token.Fraction = &fraction
 	}
-	if exponent != "" {
+	if exponent != 0 {
 		token.Exponent = &exponent
 	}
 
@@ -137,7 +137,7 @@ func NewNumericToken(text string, radix string, base int, mantissa, fraction, ex
 }
 
 // NewBalancedTernaryToken creates a new balanced ternary numeric token.
-func NewBalancedTernaryToken(text string, mantissa, fraction, exponent string, span Span) *Token {
+func NewBalancedTernaryToken(text string, mantissa, fraction string, exponent int, span Span) *Token {
 	radixPrefix := "0t"
 	base := 3
 	balanced := true
@@ -154,7 +154,7 @@ func NewBalancedTernaryToken(text string, mantissa, fraction, exponent string, s
 	if fraction != "" {
 		token.Fraction = &fraction
 	}
-	if exponent != "" {
+	if exponent != 0 {
 		token.Exponent = &exponent
 	}
 

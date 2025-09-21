@@ -3,6 +3,7 @@ package tokenizer
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -609,7 +610,15 @@ func (t *Tokenizer) parseRadixNumber(match []string) *Token {
 			span := Span{End: end}
 			t.advance(len(fullMatch))
 
-			return NewBalancedTernaryToken(fullMatch, mantissa, fraction, exponent, span)
+			exponentVal := 0
+			if exponent != "" {
+				var err error
+				exponentVal, err = strconv.Atoi(exponent)
+				if err != nil {
+					return t.createExceptionToken(fullMatch, fmt.Sprintf("invalid literal: %s", exponent))
+				}
+			}
+			return NewBalancedTernaryToken(fullMatch, mantissa, fraction, exponentVal, span)
 		} else {
 			// Invalid ternary format - should be 0t
 			return t.createExceptionToken(fullMatch, "invalid literal")
@@ -647,7 +656,15 @@ func (t *Tokenizer) parseRadixNumber(match []string) *Token {
 	span := Span{End: end}
 	t.advance(len(fullMatch))
 
-	return NewNumericToken(fullMatch, radixPrefix, base, mantissa, fraction, exponent, span)
+	exponentVal := 0
+	if exponent != "" {
+		var err error
+		exponentVal, err = strconv.Atoi(exponent)
+		if err != nil {
+			return t.createExceptionToken(fullMatch, "invalid literal")
+		}
+	}
+	return NewNumericToken(fullMatch, radixPrefix, base, mantissa, fraction, exponentVal, span)
 }
 
 // parseDecimalNumber parses a decimal number.
@@ -674,7 +691,15 @@ func (t *Tokenizer) parseDecimalNumber(match []string) *Token {
 	span := Span{End: end}
 	t.advance(len(fullMatch))
 
-	return NewNumericToken(fullMatch, "", 10, mantissa, fraction, exponent, span)
+	exponentVal := 0
+	if exponent != "" {
+		var err error
+		exponentVal, err = strconv.Atoi(exponent)
+		if err != nil {
+			return t.createExceptionToken(fullMatch, fmt.Sprintf("invalid literal: %s", err))
+		}
+	}
+	return NewNumericToken(fullMatch, "", 10, mantissa, fraction, exponentVal, span)
 }
 
 // createExceptionToken creates an exception token for invalid numeric formats.
