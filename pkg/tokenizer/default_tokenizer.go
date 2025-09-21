@@ -193,19 +193,16 @@ func (t *Tokenizer) matchOperator() *Token {
 	}
 
 	if match == ":" {
+		t.advance(len(match))
 		expected := t.getCurrentlyExpected()
 		if len(expected) > 0 {
 			expectedText := expected[0] // Use the leading token only.
 			labelTokens := t.getBridgeTokens()
 			if labelData, exists := labelTokens[expectedText]; exists {
-				t.advance(len(match))
 				return NewWildcardBridgeTokenWithAttributes(match, expectedText, labelData.Expecting, labelData.In, span)
 			}
-			return NewWildcardEndToken(match, expectedText, span)
-		} else {
-			t.advance(len(match))
-			return NewUnclassifiedToken(match, span)
 		}
+		return NewUnclassifiedToken(match, span)
 	}
 
 	// Calculate precedence using the new rules

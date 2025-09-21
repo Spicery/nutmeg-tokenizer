@@ -173,16 +173,16 @@ func NewStartToken(text string, expecting, closedBy []string, span Span) *Token 
 	}
 }
 
-// NewWildcardStartToken creates a wildcard start token with copied attributes.
-func NewWildcardStartToken(text, expectedText string, closedBy []string, span Span) *Token {
-	return &Token{
-		Text:     text,
-		Type:     StartToken,
-		Span:     span,
-		ClosedBy: closedBy,
-		Alias:    &expectedText,
-	}
-}
+// // NewWildcardStartToken creates a wildcard start token with copied attributes.
+// func NewWildcardStartToken(text, expectedText string, closedBy []string, span Span) *Token {
+// 	return &Token{
+// 		Text:     text,
+// 		Type:     StartToken,
+// 		Span:     span,
+// 		ClosedBy: closedBy,
+// 		Alias:    &expectedText,
+// 	}
+// }
 
 // NewWildcardEndToken creates a wildcard end token.
 func NewWildcardEndToken(text, expectedText string, span Span) *Token {
