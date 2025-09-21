@@ -24,7 +24,7 @@ func TestBasicTokenisation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -54,7 +54,7 @@ func TestStringTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -156,7 +156,7 @@ func TestNumericTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -270,7 +270,7 @@ func TestEnhancedNumericEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -376,7 +376,7 @@ func TestNumericWithUnderscores(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -473,7 +473,7 @@ func TestBalancedTernaryTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -543,7 +543,7 @@ func TestStartTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -588,7 +588,7 @@ func TestOperatorTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -636,7 +636,7 @@ func TestDelimiterTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -712,7 +712,7 @@ func TestKeywordClassification(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -735,7 +735,7 @@ func TestKeywordClassification(t *testing.T) {
 
 func TestJSONSerialization(t *testing.T) {
 	input := `def hello(name) "Hello, " + name end`
-	tokenizer := New(input)
+	tokenizer := NewTokenizer(input)
 	tokens, err := tokenizer.Tokenize()
 
 	if err != nil {
@@ -773,7 +773,7 @@ func TestJSONSerialization(t *testing.T) {
 func TestCommentsAreIgnored(t *testing.T) {
 	input := `hello ### this is a comment
 world`
-	tokenizer := New(input)
+	tokenizer := NewTokenizer(input)
 	tokens, err := tokenizer.Tokenize()
 
 	if err != nil {
@@ -813,7 +813,7 @@ func TestCustomRulesWildcard(t *testing.T) {
 	}
 
 	// Test with custom wildcard in a def context
-	tokenizer := NewWithRules("def foo *", rules)
+	tokenizer := NewTokenizerWithRules("def foo *", rules)
 	tokens, err := tokenizer.Tokenize()
 
 	if err != nil {
@@ -834,8 +834,8 @@ func TestCustomRulesWildcard(t *testing.T) {
 		t.Errorf("Expected wildcard token type to be Label, got %s", wildcardToken.Type)
 	}
 
-	if wildcardToken.Value == nil || *wildcardToken.Value != "=>>" {
-		t.Errorf("Expected wildcard token value to be '=>>', got '%v'", wildcardToken.Value)
+	if wildcardToken.Alias == nil || *wildcardToken.Alias != "=>>" {
+		t.Errorf("Expected wildcard token alias to be '=>>', got '%v'", wildcardToken.Alias)
 	}
 }
 
@@ -910,7 +910,7 @@ func TestExceptionTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			// Should get an error
@@ -1041,7 +1041,7 @@ func TestNewlineTracking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {
@@ -1142,7 +1142,7 @@ func TestNewlineJSONSerialization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tokenizer := New(tt.input)
+			tokenizer := NewTokenizer(tt.input)
 			tokens, err := tokenizer.Tokenize()
 
 			if err != nil {

@@ -1,6 +1,7 @@
 package tokenizer
 
 import (
+	"fmt"
 	"strings"
 	"unicode/utf8"
 )
@@ -19,37 +20,28 @@ func (t *Tokenizer) nextTokenDefault(start Position, sawNewlineBefore bool) erro
 		return t.addTokenAndManageStack(token)
 	}
 
-	// Only use default special bridge matching if no custom bridge rules are defined
-	if t.rules == nil || len(t.rules.BridgeTokens) == 0 {
-		if token := t.matchSpecialLabels(); token != nil {
-			token.Span.Start = start
-			if sawNewlineBefore {
-				token.LnBefore = &sawNewlineBefore
-			}
-			return t.addTokenAndManageStack(token)
+	// if token := t.matchSpecialLabels(); token != nil {
+	// 	token.Span.Start = start
+	// 	if sawNewlineBefore {
+	// 		token.LnBefore = &sawNewlineBefore
+	// 	}
+	// 	return t.addTokenAndManageStack(token)
+	// }
+
+	if token := t.matchOperator(); token != nil {
+		token.Span.Start = start
+		if sawNewlineBefore {
+			token.LnBefore = &sawNewlineBefore
 		}
+		return t.addTokenAndManageStack(token)
 	}
 
-	// Only use default operator matching if no custom operator rules are defined
-	if t.rules == nil || len(t.rules.OperatorPrecedences) == 0 {
-		if token := t.matchOperator(); token != nil {
-			token.Span.Start = start
-			if sawNewlineBefore {
-				token.LnBefore = &sawNewlineBefore
-			}
-			return t.addTokenAndManageStack(token)
+	if token := t.matchDelimiter(); token != nil {
+		token.Span.Start = start
+		if sawNewlineBefore {
+			token.LnBefore = &sawNewlineBefore
 		}
-	}
-
-	// Only use default delimiter matching if no custom bracket rules are defined
-	if t.rules == nil || len(t.rules.DelimiterMappings) == 0 {
-		if token := t.matchDelimiter(); token != nil {
-			token.Span.Start = start
-			if sawNewlineBefore {
-				token.LnBefore = &sawNewlineBefore
-			}
-			return t.addTokenAndManageStack(token)
-		}
+		return t.addTokenAndManageStack(token)
 	}
 
 	// If nothing matches, create an unclassified token
@@ -115,119 +107,112 @@ func (t *Tokenizer) matchIdentifier() *Token {
 	return NewToken(match, tokenType, span)
 }
 
-// matchSpecialLabels attempts to match special label sequences like '=>>' and wildcard ':'
-func (t *Tokenizer) matchSpecialLabels() *Token {
-	// Check for '=>>' special label
-	if strings.HasPrefix(t.input[t.position:], "=>>") {
-		end := Position{Line: t.line, Col: t.column + 3}
-		span := Span{End: end}
+// // matchSpecialLabels attempts to match special label sequences like '=>>' and wildcard ':'
+// func (t *Tokenizer) matchSpecialLabels() *Token {
+// 	// Check for '=>>' special label
+// 	if strings.HasPrefix(t.input[t.position:], "=>>") {
+// 		end := Position{Line: t.line, Col: t.column + 3}
+// 		span := Span{End: end}
 
-		labelData := bridgeTokens["=>>"]
-		t.advance(3)
-		return NewStmntBridgeToken("=>>", labelData.Expecting, labelData.In, span)
-	}
+// 		labelData := bridgeTokens["=>>"]
+// 		t.advance(3)
+// 		return NewStmntBridgeToken("=>>", labelData.Expecting, labelData.In, span)
+// 	}
 
-	// Check for wildcard tokens
-	wildcardTokens := t.getWildcardTokens()
-	for wildcardText := range wildcardTokens {
-		if t.position < len(t.input) && strings.HasPrefix(t.input[t.position:], wildcardText) {
-			// For single character wildcards, make sure it's not part of a longer operator
-			if len(wildcardText) == 1 && wildcardText == ":" {
-				if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
-					continue // Skip this wildcard as it's part of a longer operator
-				}
-			}
+// 	// Check for wildcard tokens
+// 	wildcardTokens := t.getWildcardTokens()
+// 	for wildcardText := range wildcardTokens {
+// 		if t.position < len(t.input) && strings.HasPrefix(t.input[t.position:], wildcardText) {
+// 			// For single character wildcards, make sure it's not part of a longer operator
+// 			if len(wildcardText) == 1 && wildcardText == ":" {
+// 				if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
+// 					continue // Skip this wildcard as it's part of a longer operator
+// 				}
+// 			}
 
-			end := Position{Line: t.line, Col: t.column + len(wildcardText)}
-			span := Span{End: end}
+// 			end := Position{Line: t.line, Col: t.column + len(wildcardText)}
+// 			span := Span{End: end}
 
-			// Check if we have context from the expecting stack
-			expected := t.getCurrentlyExpected()
-			if len(expected) > 0 {
-				// Use the first expected token as the basis for the wildcard
-				expectedText := expected[0]
+// 			// Check if we have context from the expecting stack
+// 			expected := t.getCurrentlyExpected()
+// 			if len(expected) > 0 {
+// 				// Use the first expected token as the basis for the wildcard
+// 				expectedText := expected[0]
 
-				// Check if it's a label token
-				labelTokens := t.getBridgeTokens()
-				if labelData, exists := labelTokens[expectedText]; exists {
-					// Create a wildcard token that copies attributes from the expected label
-					t.advance(len(wildcardText))
-					return NewWildcardBridgeTokenWithAttributes(wildcardText, expectedText, labelData.Expecting, labelData.In, span)
-				}
+// 				// Check if it's a label token
+// 				labelTokens := t.getBridgeTokens()
+// 				if labelData, exists := labelTokens[expectedText]; exists {
+// 					// Create a wildcard token that copies attributes from the expected label
+// 					t.advance(len(wildcardText))
+// 					return NewWildcardBridgeTokenWithAttributes(wildcardText, expectedText, labelData.Expecting, labelData.In, span)
+// 				}
 
-				// Check if it's a start token
-				startTokens := t.getStartTokens()
-				if startData, exists := startTokens[expectedText]; exists {
-					// Create wildcard start token
-					t.advance(len(wildcardText))
-					return NewWildcardStartToken(wildcardText, expectedText, startData.ClosedBy, span)
-				}
+// 				// Check if it's a start token
+// 				startTokens := t.getStartTokens()
+// 				if startData, exists := startTokens[expectedText]; exists {
+// 					// Create wildcard start token
+// 					t.advance(len(wildcardText))
+// 					return NewWildcardStartToken(wildcardText, expectedText, startData.ClosedBy, span)
+// 				}
 
-				// Check if it's an end token (starts with "end")
-				if strings.HasPrefix(expectedText, "end") {
-					// Create wildcard end token
-					t.advance(len(wildcardText))
-					return NewWildcardEndToken(wildcardText, expectedText, span)
-				}
-			}
+// 				// Check if it's an end token (starts with "end")
+// 				if strings.HasPrefix(expectedText, "end") {
+// 					// Create wildcard end token
+// 					t.advance(len(wildcardText))
+// 					return NewWildcardEndToken(wildcardText, expectedText, span)
+// 				}
+// 			}
 
-			// No context available, create unclassified token
-			t.advance(len(wildcardText))
-			return NewToken(wildcardText, UnclassifiedToken, span)
-		}
-	}
+// 			// No context available, create unclassified token
+// 			t.advance(len(wildcardText))
+// 			return NewToken(wildcardText, UnclassifiedToken, span)
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 // matchOperator attempts to match an operator.
 func (t *Tokenizer) matchOperator() *Token {
+	fmt.Println("matchOperator called at position", t.position, "input:", t.input[t.position:])
+
 	match := operatorRegex.FindString(t.input[t.position:])
 	if match == "" {
 		return nil
 	}
 
-	// Check if this might be a custom delimiter first (open delimiters)
-	delimMappings := t.getDelimiterMappings()
-	firstChar := string(match[0])
-	if _, isDelimiter := delimMappings[firstChar]; isDelimiter {
-		// Let delimiter matching handle this instead
-		return nil
+	fmt.Println("Operator matched:", match)
+
+	end := Position{Line: t.line, Col: t.column + len(match)}
+	span := Span{End: end}
+
+	if match == "=>>" {
+		labelData := bridgeTokens["=>>"]
+		t.advance(len(match))
+		return NewStmntBridgeToken(match, labelData.Expecting, labelData.In, span)
 	}
 
-	// Check if this might be a closing delimiter
-	for _, closedByList := range delimMappings {
-		for _, closer := range closedByList {
-			if firstChar == closer {
-				// Let delimiter matching handle this instead
-				return nil
+	if match == ":" {
+		expected := t.getCurrentlyExpected()
+		if len(expected) > 0 {
+			expectedText := expected[0] // Use the leading token only.
+			labelTokens := t.getBridgeTokens()
+			if labelData, exists := labelTokens[expectedText]; exists {
+				t.advance(len(match))
+				return NewWildcardBridgeTokenWithAttributes(match, expectedText, labelData.Expecting, labelData.In, span)
 			}
+			return NewWildcardEndToken(match, expectedText, span)
+		} else {
+			t.advance(len(match))
+			return NewUnclassifiedToken(match, span)
 		}
 	}
 
-	// Special case: single ':' is treated as a wildcard simple-label, not an operator
-	if match == ":" {
-		// This should be handled elsewhere as a label token
-		return nil
-	}
-
-	// Special case: '=>>' is treated as a simple-label, not an operator
-	if strings.HasPrefix(match, "=>>") {
-		// This should be handled elsewhere as a label token
-		return nil
-	}
-
-	// Use the entire match as the operator (greedy matching)
-	operator := match
-
-	end := Position{Line: t.line, Col: t.column + len(operator)}
-	span := Span{End: end}
-
 	// Calculate precedence using the new rules
-	prefix, infix, postfix := calculateOperatorPrecedence(operator)
+	prefix, infix, postfix := calculateOperatorPrecedence(match)
 
-	t.advance(len(operator))
-	return NewOperatorToken(operator, prefix, infix, postfix, span)
+	t.advance(len(match))
+	return NewOperatorToken(match, prefix, infix, postfix, span)
 }
 
 // matchDelimiter attempts to match a delimiter using default rules only.

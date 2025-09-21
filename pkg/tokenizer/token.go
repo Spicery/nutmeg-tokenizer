@@ -60,9 +60,10 @@ func (s *Span) UnmarshalJSON(data []byte) error {
 // Token represents a single token from the Nutmeg source code.
 type Token struct {
 	// Common fields for all tokens
-	Text string    `json:"text"`
-	Span Span      `json:"span"`
-	Type TokenType `json:"type"`
+	Text  string    `json:"text"`
+	Span  Span      `json:"span"`
+	Type  TokenType `json:"type"`
+	Alias *string   `json:"alias,omitempty"` // The node alias, if any
 
 	// String token fields
 	Value *string `json:"value,omitempty"`
@@ -179,7 +180,7 @@ func NewWildcardStartToken(text, expectedText string, closedBy []string, span Sp
 		Type:     StartToken,
 		Span:     span,
 		ClosedBy: closedBy,
-		Value:    &expectedText,
+		Alias:    &expectedText,
 	}
 }
 
@@ -189,7 +190,7 @@ func NewWildcardEndToken(text, expectedText string, span Span) *Token {
 		Text:  text,
 		Type:  EndToken,
 		Span:  span,
-		Value: &expectedText,
+		Alias: &expectedText,
 	}
 }
 
@@ -255,7 +256,7 @@ func NewWildcardBridgeToken(text string, span Span) *Token {
 		Text:  text,
 		Type:  BridgeToken,
 		Span:  span,
-		Value: &value,
+		Alias: &value,
 	}
 }
 
@@ -267,7 +268,15 @@ func NewWildcardBridgeTokenWithAttributes(text, expectedText string, expecting, 
 		Span:      span,
 		Expecting: expecting,
 		In:        in,
-		Value:     &expectedText,
+		Alias:     &expectedText,
+	}
+}
+
+func NewUnclassifiedToken(text string, span Span) *Token {
+	return &Token{
+		Text: text,
+		Type: UnclassifiedToken,
+		Span: span,
 	}
 }
 

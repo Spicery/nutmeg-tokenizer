@@ -188,8 +188,8 @@ var delimiterProperties = map[string][2]bool{
 	"{": {true, true},  // infix=false, prefix=true
 }
 
-// New creates a new tokenizer instance with default rules.
-func New(input string) *Tokenizer {
+// NewTokenizer creates a new tokenizer instance with default rules.
+func NewTokenizer(input string) *Tokenizer {
 	return &Tokenizer{
 		input:          input,
 		line:           1,
@@ -200,8 +200,8 @@ func New(input string) *Tokenizer {
 	}
 }
 
-// NewWithRules creates a new tokenizer instance with custom rules.
-func NewWithRules(input string, rules *TokenizerRules) *Tokenizer {
+// NewTokenizerWithRules creates a new tokenizer instance with custom rules.
+func NewTokenizerWithRules(input string, rules *TokenizerRules) *Tokenizer {
 	return &Tokenizer{
 		input:          input,
 		line:           1,
@@ -214,12 +214,12 @@ func NewWithRules(input string, rules *TokenizerRules) *Tokenizer {
 
 // Helper methods to access rules with fallback to global variables
 
-func (t *Tokenizer) getStartTokens() map[string]StartTokenData {
-	if t.rules != nil {
-		return t.rules.StartTokens
-	}
-	return startTokens
-}
+// func (t *Tokenizer) getStartTokens() map[string]StartTokenData {
+// 	if t.rules != nil {
+// 		return t.rules.StartTokens
+// 	}
+// 	return startTokens
+// }
 
 func (t *Tokenizer) getBridgeTokens() map[string]BridgeTokenData {
 	if t.rules != nil {
@@ -228,20 +228,20 @@ func (t *Tokenizer) getBridgeTokens() map[string]BridgeTokenData {
 	return bridgeTokens
 }
 
-func (t *Tokenizer) getWildcardTokens() map[string]bool {
-	if t.rules != nil {
-		return t.rules.WildcardTokens
-	}
-	// Default wildcard is just ":"
-	return map[string]bool{":": true}
-}
+// func (t *Tokenizer) getWildcardTokens() map[string]bool {
+// 	if t.rules != nil {
+// 		return t.rules.WildcardTokens
+// 	}
+// 	// Default wildcard is just ":"
+// 	return map[string]bool{":": true}
+// }
 
-func (t *Tokenizer) getDelimiterMappings() map[string][]string {
-	if t.rules != nil {
-		return t.rules.DelimiterMappings
-	}
-	return delimiterMappings
-}
+// func (t *Tokenizer) getDelimiterMappings() map[string][]string {
+// 	if t.rules != nil {
+// 		return t.rules.DelimiterMappings
+// 	}
+// 	return delimiterMappings
+// }
 
 // pushExpecting pushes a new set of expected tokens onto the stack.
 func (t *Tokenizer) pushExpecting(expected []string) {
@@ -683,13 +683,6 @@ func (t *Tokenizer) matchCustomRules() *Token {
 	// Process the single rule entry
 	switch entry.Type {
 	case CustomWildcard:
-		// For single character wildcards, make sure it's not part of a longer operator
-		if len(text) == 1 && text == ":" {
-			if t.position+1 < len(t.input) && strings.ContainsRune("*/%+-<>~!&^|?=:", rune(t.input[t.position+1])) {
-				return nil // Skip this wildcard as it's part of a longer operator
-			}
-		}
-
 		// Check if we have context from the expecting stack
 		expected := t.getCurrentlyExpected()
 		if len(expected) > 0 {
@@ -701,20 +694,6 @@ func (t *Tokenizer) matchCustomRules() *Token {
 				// Create a wildcard token that copies attributes from the expected label
 				t.advance(len(text))
 				return NewWildcardBridgeTokenWithAttributes(text, expectedText, bridgeData.Expecting, bridgeData.In, span)
-			}
-
-			// Check if it's a start token
-			if startData, exists := t.rules.StartTokens[expectedText]; exists {
-				// Create wildcard start token
-				t.advance(len(text))
-				return NewWildcardStartToken(text, expectedText, startData.ClosedBy, span)
-			}
-
-			// Check if it's an end token (starts with "end")
-			if strings.HasPrefix(expectedText, "end") {
-				// Create wildcard end token
-				t.advance(len(text))
-				return NewWildcardEndToken(text, expectedText, span)
 			}
 		}
 
