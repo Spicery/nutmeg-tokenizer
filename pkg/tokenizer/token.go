@@ -163,13 +163,14 @@ func NewBalancedTernaryToken(text string, mantissa, fraction string, exponent in
 }
 
 // NewStartToken creates a new start token with expecting and closed_by tokens.
-func NewStartToken(text string, expecting, closedBy []string, span Span) *Token {
+func NewStartToken(text string, expecting, closedBy []string, span Span, single bool) *Token {
 	return &Token{
 		Text:      text,
 		Type:      StartToken,
 		Span:      span,
 		Expecting: expecting,
 		ClosedBy:  closedBy,
+		Single:    &single,
 	}
 }
 

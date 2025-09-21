@@ -35,6 +35,7 @@ type StartRule struct {
 	Text      string   `yaml:"text"`
 	ClosedBy  []string `yaml:"closed_by"`
 	Expecting []string `yaml:"expecting"`
+	Single    bool     `yaml:"single"`
 }
 
 // BridgeRule represents a bridge token rule
@@ -224,10 +225,12 @@ func getDefaultStartTokens() map[string]StartTokenData {
 		"def": {
 			Expecting: []string{"=>>"},
 			ClosedBy:  []string{"end", "enddef"},
+			Single:    true,
 		},
 		"if": {
 			Expecting: []string{"then"},
 			ClosedBy:  []string{"end", "endif"},
+			Single:    true,
 		},
 		"ifnot": {
 			Expecting: []string{"then"},

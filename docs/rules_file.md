@@ -76,12 +76,14 @@ start:
       - endif
     expecting: 
       - then
+    single: true
   - text: "def"
     closed_by:
       - end
       - enddef
     expecting:
       - "=>>"
+    single: true
 ```
 
 ## Label rules
