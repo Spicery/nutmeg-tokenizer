@@ -682,7 +682,7 @@ func TestKeywordClassification(t *testing.T) {
 		input        string
 		expectedType TokenType
 	}{
-		// Label tokens (L)
+		// Bridge tokens (L)
 		{"=>>", BridgeToken},
 		{"do", BridgeToken},
 		{"then", BridgeToken},
@@ -824,7 +824,7 @@ func TestCustomRulesWildcard(t *testing.T) {
 	}
 
 	if wildcardToken.Type != BridgeToken {
-		t.Errorf("Expected wildcard token type to be Label, got %s", wildcardToken.Type)
+		t.Errorf("Expected wildcard token type to be Bridge, got %s", wildcardToken.Type)
 	}
 
 	if wildcardToken.Alias == nil || *wildcardToken.Alias != "=>>" {

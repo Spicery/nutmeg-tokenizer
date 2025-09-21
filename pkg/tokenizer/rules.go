@@ -79,7 +79,7 @@ const (
 // CustomRuleEntry holds the rule type and any associated data
 type CustomRuleEntry struct {
 	Type CustomRuleType
-	Data interface{} // Can be StartTokenData, LabelTokenData, etc.
+	Data interface{} // Can be StartTokenData, BridgeTokenData, etc.
 }
 
 // TokenizerRules holds all the rule maps that can be customized

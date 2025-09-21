@@ -87,7 +87,8 @@ The `span` field is serialized as a 4-element array `[start_line, start_col, end
   "span": [1, 1, 1, 4],
   "type": "B",
   "expecting": ["then"],    // What tokens can follow this label
-  "in": ["if", "unless"]    // What start tokens can contain this label
+  "in": ["if", "unless"],   // What start tokens can contain this label
+  "single": false
 }
 ```
 

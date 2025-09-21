@@ -180,13 +180,13 @@ func (t *Tokenizer) addTokenAndManageStack(token *Token) error {
 		// Pop the expecting stack
 		t.popExpecting()
 	case BridgeToken:
-		// Update expecting for label and compound tokens based on their attributes
+		// Update expecting for bridge tokens based on their attributes
 		if token.Expecting != nil {
 			// If the token has explicit expecting, replace current expectations
 			t.popExpecting() // Remove current expectations			}
 			t.pushExpecting(token.Expecting)
 		} else {
-			// For label/compound tokens without explicit expecting, use defaults.
+			// For bridge tokens without explicit expecting, use defaults.
 			switch token.Text {
 			case "=>>":
 				// After =>> we expect do
@@ -195,9 +195,9 @@ func (t *Tokenizer) addTokenAndManageStack(token *Token) error {
 				// After do in "for x do" or "def f(x) =>> do", we expect end
 				t.replaceExpecting([]string{"end"})
 			default:
-				// For other label/compound tokens, check if they have their own expectations
-				if labelData, exists := bridgeTokens[token.Text]; exists {
-					t.replaceExpecting(labelData.Expecting)
+				// For other bridge tokens, check if they have their own expectations
+				if bridgeData, exists := bridgeTokens[token.Text]; exists {
+					t.replaceExpecting(bridgeData.Expecting)
 				}
 			}
 		}
@@ -579,9 +579,9 @@ func (t *Tokenizer) matchCustomRules() *Token {
 			// Use the first expected token as the basis for the wildcard
 			expectedText := expected[0]
 
-			// Check if it's a label token
+			// Check if it's a bridge token
 			if bridgeData, exists := t.rules.BridgeTokens[expectedText]; exists {
-				// Create a wildcard token that copies attributes from the expected label
+				// Create a wildcard token that copies attributes from the expected bridge
 				t.advance(len(text))
 				return NewWildcardBridgeToken(text, expectedText, bridgeData.Expecting, bridgeData.In, span)
 			}
@@ -601,9 +601,9 @@ func (t *Tokenizer) matchCustomRules() *Token {
 		return NewToken(text, EndToken, span)
 
 	case CustomBridge:
-		labelData := entry.Data.(BridgeTokenData)
+		bridgeData := entry.Data.(BridgeTokenData)
 		t.advance(len(text))
-		return NewStmntBridgeToken(text, labelData.Expecting, labelData.In, span)
+		return NewStmntBridgeToken(text, bridgeData.Expecting, bridgeData.In, span)
 
 	case CustomPrefix:
 		t.advance(len(text))

@@ -76,9 +76,9 @@ type Token struct {
 	Exponent *int    `json:"exponent,omitempty"`
 	Balanced *bool   `json:"balanced,omitempty"` // For balanced ternary numbers
 
-	// Start token, Label token, and Compound token fields
-	Expecting []string `json:"expecting,omitempty"` // For start tokens (immediate next tokens) and label/compound tokens (what can follow them)
-	In        []string `json:"in,omitempty"`        // For label and compound tokens - what can contain them
+	// Start token, Bridge token, and Compound token fields
+	Expecting []string `json:"expecting,omitempty"` // For start tokens (immediate next tokens) and bridge tokens (what can follow them)
+	In        []string `json:"in,omitempty"`        // For bridge and compound tokens - what can contain them
 	ClosedBy  []string `json:"closed_by,omitempty"` // For start tokens and delimiter tokens - what can close them
 	Single    *bool    `json:"single,omitempty"`    // For start tokens - whether they introduce a single statement block
 
@@ -202,7 +202,7 @@ func NewDelimiterToken(text string, closedBy []string, isInfix, isPrefix bool, s
 	}
 }
 
-// NewStmntBridgeToken creates a new label token with expecting and in attributes.
+// NewStmntBridgeToken creates a new bridge token with expecting and in attributes.
 func NewStmntBridgeToken(text string, expecting, in []string, span Span) *Token {
 	return NewBridgeToken(text, expecting, in, false, span)
 }
@@ -223,7 +223,7 @@ func NewBridgeToken(text string, expecting, in []string, single bool, span Span)
 	}
 }
 
-// NewWildcardBridgeToken creates a wildcard label token with copied attributes.
+// NewWildcardBridgeToken creates a wildcard bridge token with copied attributes.
 func NewWildcardBridgeToken(text, expectedText string, expecting, in []string, span Span) *Token {
 	return &Token{
 		Text:      text,
