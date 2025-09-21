@@ -320,14 +320,6 @@ func (t *Tokenizer) nextToken() error {
 		return t.addTokenAndManageStack(token)
 	}
 
-	if token := t.matchIdentifier(); token != nil {
-		token.Span.Start = start
-		if sawNewlineBefore {
-			token.LnBefore = &sawNewlineBefore
-		}
-		return t.addTokenAndManageStack(token)
-	}
-
 	// If nothing matches, create an unclassified token
 	r, size := utf8.DecodeRuneInString(t.input[t.position:])
 	text := string(r)
@@ -611,8 +603,11 @@ func (t *Tokenizer) matchCustomRules() *Token {
 	var text string
 
 	// Check for alphanumeric + underbar sequences
+	// fmt.Println("Custom rules check at position", t.position, "char:", string(t.input[t.position]))
+	is_identifier := false
 	if match := identifierRegex.FindString(t.input[t.position:]); match != "" {
 		text = match
+		is_identifier = true
 	} else if match := operatorRegex.FindString(t.input[t.position:]); match != "" {
 		// Check for sign character sequences
 		text = match
@@ -625,14 +620,23 @@ func (t *Tokenizer) matchCustomRules() *Token {
 		return nil
 	}
 
-	// Efficient lookup - single map access
-	entry, exists := t.rules.TokenLookup[text]
-	if !exists {
-		return nil
-	}
+	// fmt.Println("Custom rules token text:", text)
+	// fmt.Println("is_identifier?", is_identifier)
 
 	end := Position{Line: t.line, Col: t.column + len(text)}
 	span := Span{End: end}
+
+	// Efficient lookup - single map access
+	entry, exists := t.rules.TokenLookup[text]
+	if !exists {
+		if is_identifier {
+
+			// If it's an identifier and no special type, treat as VariableToken
+			t.advance(len(text))
+			return NewToken(text, VariableToken, span)
+		}
+		return nil // No matching custom rule
+	}
 
 	// Process the single rule entry
 	switch entry.Type {
@@ -706,4 +710,53 @@ func (t *Tokenizer) advance(n int) {
 		}
 		t.position++
 	}
+}
+
+// matchIdentifier attempts to match an identifier.
+func (t *Tokenizer) matchIdentifier() *Token {
+	match := identifierRegex.FindString(t.input[t.position:])
+	if match == "" {
+		return nil
+	}
+
+	end := Position{Line: t.line, Col: t.column + len(match)}
+	span := Span{End: end}
+
+	// Check if it's a start token (only if no custom start rules are defined)
+	if t.rules == nil || len(t.rules.StartTokens) == 0 {
+		if startData, isStart := startTokens[match]; isStart {
+			t.advance(len(match))
+			return NewStartToken(match, startData.Expecting, startData.ClosedBy, span)
+		}
+	}
+
+	// Check if it's an end token - only if no custom start rules are defined
+	if t.rules == nil || len(t.rules.StartTokens) == 0 {
+		if strings.HasPrefix(match, "end") {
+			t.advance(len(match))
+			return NewToken(match, EndToken, span)
+		}
+	}
+
+	// Check if it's a bridge token (B) - only if no custom bridge rules are defined
+	if t.rules == nil || len(t.rules.BridgeTokens) == 0 {
+		if labelData, isLabel := bridgeTokens[match]; isLabel {
+			t.advance(len(match))
+			return NewStmntBridgeToken(match, labelData.Expecting, labelData.In, span)
+		}
+	}
+
+	// Default to VariableToken, but check for prefix tokens
+	var tokenType TokenType = VariableToken
+
+	// Check if it's a prefix token (P) - only if no custom prefix rules are defined
+	if t.rules == nil || len(t.rules.PrefixTokens) == 0 {
+		if prefixTokens[match] {
+			tokenType = PrefixToken
+		}
+	}
+	// Otherwise, default to VariableToken
+
+	t.advance(len(match))
+	return NewToken(match, tokenType, span)
 }
