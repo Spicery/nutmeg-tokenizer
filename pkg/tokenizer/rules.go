@@ -19,10 +19,10 @@ type RulesFile struct {
 
 // BracketRule represents a bracket token rule
 type BracketRule struct {
-	Text     string   `yaml:"text"`
-	ClosedBy []string `yaml:"closed_by"`
-	Infix    bool     `yaml:"infix"`
-	Prefix   bool     `yaml:"prefix"`
+	Text      string   `yaml:"text"`
+	ClosedBy  []string `yaml:"closed_by"`
+	InfixPrec int      `yaml:"infix"`
+	Prefix    bool     `yaml:"prefix"`
 }
 
 // PrefixRule represents a prefix token rule
@@ -89,7 +89,7 @@ type TokenizerRules struct {
 	BridgeTokens        map[string]BridgeTokenData
 	PrefixTokens        map[string]bool
 	DelimiterMappings   map[string][]string
-	DelimiterProperties map[string][2]bool
+	DelimiterProperties map[string]DelimiterProp
 	WildcardTokens      map[string]bool
 	OperatorPrecedences map[string][3]int // [prefix, infix, postfix]
 
@@ -141,11 +141,11 @@ func ApplyRulesToDefaults(rules *RulesFile) (*TokenizerRules, error) {
 	// Apply bracket rules
 	if len(rules.Bracket) > 0 {
 		tokenizerRules.DelimiterMappings = make(map[string][]string)
-		tokenizerRules.DelimiterProperties = make(map[string][2]bool)
+		tokenizerRules.DelimiterProperties = make(map[string]DelimiterProp)
 
 		for _, rule := range rules.Bracket {
 			tokenizerRules.DelimiterMappings[rule.Text] = rule.ClosedBy
-			tokenizerRules.DelimiterProperties[rule.Text] = [2]bool{rule.Infix, rule.Prefix}
+			tokenizerRules.DelimiterProperties[rule.Text] = DelimiterProp{rule.InfixPrec, rule.Prefix}
 		}
 	}
 
@@ -307,11 +307,19 @@ func getDefaultDelimiterMappings() map[string][]string {
 	}
 }
 
-func getDefaultDelimiterProperties() map[string][2]bool {
-	return map[string][2]bool{
-		"(": {true, true},  // infix=true, prefix=true
-		"[": {true, false}, // infix=true, prefix=false
-		"{": {true, true},  // infix=false, prefix=true
+type DelimiterProp struct {
+	InfixPrec int
+	Prefix    bool
+}
+
+func getDefaultDelimiterProperties() map[string]DelimiterProp {
+	_, a, _ := calculateOperatorPrecedence("(")
+	_, b, _ := calculateOperatorPrecedence("[")
+	_, c, _ := calculateOperatorPrecedence("{")
+	return map[string]DelimiterProp{
+		"(": {a, true},  // infix=true, prefix=true
+		"[": {b, false}, // infix=true, prefix=false
+		"{": {c, true},  // infix=false, prefix=true
 	}
 }
 
@@ -379,13 +387,13 @@ func (rules *TokenizerRules) BuildTokenLookup() error {
 	for token, closedBy := range rules.DelimiterMappings {
 		props := rules.DelimiterProperties[token]
 		delimiterData := struct {
-			ClosedBy []string
-			IsInfix  bool
-			IsPrefix bool
+			ClosedBy  []string
+			InfixPrec int
+			IsPrefix  bool
 		}{
-			ClosedBy: closedBy,
-			IsInfix:  props[0],
-			IsPrefix: props[1],
+			ClosedBy:  closedBy,
+			InfixPrec: props.InfixPrec,
+			IsPrefix:  props.Prefix,
 		}
 		if err := addToken(token, CustomOpenDelimiter, "bracket", delimiterData); err != nil {
 			return err

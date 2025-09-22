@@ -74,22 +74,27 @@ var bridgeTokens = map[string]BridgeTokenData{
 }
 
 // Base precedence values for operator characters (from operators.md)
+// Should follow this order: .([{*/%+-<>~!&^|?:=
 var baseOperatorPrecedence = map[rune]int{
-	'*': 10,
-	'/': 20,
-	'%': 30,
-	'+': 40,
-	'-': 50,
-	'<': 60,
-	'>': 70,
-	'~': 80,
-	'!': 90,
-	'&': 100,
-	'^': 110,
-	'|': 120,
-	'?': 130,
-	'=': 140,
-	':': 150,
+	'.': 10,
+	'(': 20,
+	'[': 30,
+	'{': 40,
+	'*': 50,
+	'/': 60,
+	'%': 70,
+	'+': 80,
+	'-': 90,
+	'<': 100,
+	'>': 110,
+	'~': 120,
+	'!': 130,
+	'&': 140,
+	'^': 150,
+	'|': 160,
+	'?': 170,
+	'=': 180,
+	':': 190,
 }
 
 // NewTokenizer creates a new tokenizer instance with default rules.
@@ -617,12 +622,12 @@ func (t *Tokenizer) matchCustomRules() *Token {
 
 	case CustomOpenDelimiter:
 		delimiterData := entry.Data.(struct {
-			ClosedBy []string
-			IsInfix  bool
-			IsPrefix bool
+			ClosedBy  []string
+			InfixPrec int
+			IsPrefix  bool
 		})
 		t.advance(len(text))
-		return NewDelimiterToken(text, delimiterData.ClosedBy, delimiterData.IsInfix, delimiterData.IsPrefix, span)
+		return NewDelimiterToken(text, delimiterData.ClosedBy, delimiterData.InfixPrec, delimiterData.IsPrefix, span)
 
 	case CustomCloseDelimiter:
 		t.advance(len(text))

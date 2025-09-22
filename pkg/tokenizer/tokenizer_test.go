@@ -580,10 +580,10 @@ func TestOperatorTokens(t *testing.T) {
 		input              string
 		expectedPrecedence [3]int // [prefix, infix, postfix]
 	}{
-		{"+", [3]int{0, 2040, 0}},  // + has base precedence 40, only infix enabled (40+2000=2040)
-		{"-", [3]int{50, 2050, 0}}, // - has base precedence 50, both prefix (50) and infix (50+2000=2050) enabled
-		{"*", [3]int{0, 2010, 0}},  // * has base precedence 10, only infix enabled (10+2000=2010)
-		{"==", [3]int{0, 2139, 0}}, // = has base precedence 140, repeated so 139, only infix enabled (139+2000=2139)
+		{"+", [3]int{0, 2080, 0}},  // + has base precedence 40, only infix enabled (40+2000=2040)
+		{"-", [3]int{90, 2090, 0}}, // - has base precedence 50, both prefix (50) and infix (50+2000=2050) enabled
+		{"*", [3]int{0, 2050, 0}},  // * has base precedence 10, only infix enabled (10+2000=2010)
+		{"==", [3]int{0, 2179, 0}}, // = has base precedence 140, repeated so 139, only infix enabled (139+2000=2139)
 	}
 
 	for _, tt := range tests {
@@ -623,15 +623,15 @@ func TestDelimiterTokens(t *testing.T) {
 		input        string
 		expectedType TokenType
 		closedBy     []string
-		isInfix      bool
+		infixPrec    int
 		isPrefix     bool
 	}{
-		{"(", OpenDelimiter, []string{")"}, true, true},
-		{"[", OpenDelimiter, []string{"]"}, true, false},
-		{"{", OpenDelimiter, []string{"}"}, true, true}, // Updated: now supports infix usage for f{x} syntax
-		{")", CloseDelimiter, nil, false, false},
-		{"]", CloseDelimiter, nil, false, false},
-		{"}", CloseDelimiter, nil, false, false},
+		{"(", OpenDelimiter, []string{")"}, 2020, true},
+		{"[", OpenDelimiter, []string{"]"}, 2030, false},
+		{"{", OpenDelimiter, []string{"}"}, 2040, true}, // Updated: now supports infix usage for f{x} syntax
+		{")", CloseDelimiter, nil, 0, false},
+		{"]", CloseDelimiter, nil, 0, false},
+		{"}", CloseDelimiter, nil, 0, false},
 	}
 
 	for _, tt := range tests {
@@ -665,8 +665,8 @@ func TestDelimiterTokens(t *testing.T) {
 					}
 				}
 
-				if token.Infix == nil || *token.Infix != tt.isInfix {
-					t.Errorf("Expected infix %t, got %v", tt.isInfix, token.Infix)
+				if token.InfixPrecedence == nil || *token.InfixPrecedence != tt.infixPrec {
+					t.Errorf("Expected infix %d, got %v", tt.infixPrec, token.InfixPrecedence)
 				}
 
 				if token.Prefix == nil || *token.Prefix != tt.isPrefix {

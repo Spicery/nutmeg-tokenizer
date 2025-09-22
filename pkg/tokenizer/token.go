@@ -86,8 +86,8 @@ type Token struct {
 	Precedence *[3]int `json:"precedence,omitempty"` // [prefix, infix, postfix] precedence values
 
 	// Delimiter fields (for '[' tokens)
-	Infix  *bool `json:"infix,omitempty"`  // For delimiter infix usage
-	Prefix *bool `json:"prefix,omitempty"` // For delimiter prefix usage
+	InfixPrecedence *int  `json:"infix,omitempty"`  // For delimiter infix usage
+	Prefix          *bool `json:"prefix,omitempty"` // For delimiter prefix usage
 
 	// Exception token fields
 	Reason *string `json:"reason,omitempty"` // For exception tokens - explanation of the error
@@ -192,14 +192,14 @@ func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token
 }
 
 // NewDelimiterToken creates a new open delimiter token.
-func NewDelimiterToken(text string, closedBy []string, isInfix, isPrefix bool, span Span) *Token {
+func NewDelimiterToken(text string, closedBy []string, isInfix int, isPrefix bool, span Span) *Token {
 	return &Token{
-		Text:     text,
-		Type:     OpenDelimiter,
-		Span:     span,
-		ClosedBy: closedBy,
-		Infix:    &isInfix,
-		Prefix:   &isPrefix,
+		Text:            text,
+		Type:            OpenDelimiter,
+		Span:            span,
+		ClosedBy:        closedBy,
+		InfixPrecedence: &isInfix,
+		Prefix:          &isPrefix,
 	}
 }
 
