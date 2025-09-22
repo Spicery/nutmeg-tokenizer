@@ -15,10 +15,10 @@ prefix:
 start:
   - text: "begin"
     closed_by: ["finish"]
-    single: false
+    arity: 2
   - text: "loop"
     closed_by: ["endloop"]
-    single: true
+    arity: 1
 
 label:
   - text: "where"
