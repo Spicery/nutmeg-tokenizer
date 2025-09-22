@@ -33,7 +33,7 @@ var (
 type StartTokenData struct {
 	Expecting []string
 	ClosedBy  []string
-	Single    bool
+	Arity     Arity
 }
 
 // Bridge tokens (B) with their attributes
@@ -600,7 +600,7 @@ func (t *Tokenizer) matchCustomRules() *Token {
 	case CustomStart:
 		startData := entry.Data.(StartTokenData)
 		t.advance(len(text))
-		return NewStartToken(text, startData.Expecting, startData.ClosedBy, span, startData.Single)
+		return NewStartToken(text, startData.Expecting, startData.ClosedBy, span, startData.Arity)
 
 	case CustomEnd:
 		t.advance(len(text))

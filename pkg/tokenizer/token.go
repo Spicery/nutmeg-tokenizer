@@ -57,6 +57,14 @@ func (s *Span) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type Arity int
+
+const (
+	Zero Arity = iota
+	One
+	Many
+)
+
 // Token represents a single token from the Nutmeg source code.
 type Token struct {
 	// Common fields for all tokens
@@ -80,7 +88,7 @@ type Token struct {
 	Expecting []string `json:"expecting,omitempty"` // For start tokens (immediate next tokens) and bridge tokens (what can follow them)
 	In        []string `json:"in,omitempty"`        // For bridge and compound tokens - what can contain them
 	ClosedBy  []string `json:"closed_by,omitempty"` // For start tokens and delimiter tokens - what can close them
-	Single    *bool    `json:"single,omitempty"`    // For start tokens - whether they introduce a single statement block
+	Arity     *Arity   `json:"arity,omitempty"`     // For start tokens - whether they introduce a single statement block
 
 	// Operator token fields
 	Precedence *[3]int `json:"precedence,omitempty"` // [prefix, infix, postfix] precedence values
@@ -163,14 +171,14 @@ func NewBalancedTernaryToken(text string, mantissa, fraction string, exponent in
 }
 
 // NewStartToken creates a new start token with expecting and closed_by tokens.
-func NewStartToken(text string, expecting, closedBy []string, span Span, single bool) *Token {
+func NewStartToken(text string, expecting, closedBy []string, span Span, arity Arity) *Token {
 	return &Token{
 		Text:      text,
 		Type:      StartToken,
 		Span:      span,
 		Expecting: expecting,
 		ClosedBy:  closedBy,
-		Single:    &single,
+		Arity:     &arity,
 	}
 }
 
@@ -205,22 +213,22 @@ func NewDelimiterToken(text string, closedBy []string, isInfix int, isPrefix boo
 
 // NewStmntBridgeToken creates a new bridge token with expecting and in attributes.
 func NewStmntBridgeToken(text string, expecting, in []string, span Span) *Token {
-	return NewBridgeToken(text, expecting, in, false, span)
+	return NewBridgeToken(text, expecting, in, Many, span)
 }
 
 // NewExprBridgeToken creates a new compound token with expecting and in attributes.
 func NewExprBridgeToken(text string, expecting, in []string, span Span) *Token {
-	return NewBridgeToken(text, expecting, in, true, span)
+	return NewBridgeToken(text, expecting, in, One, span)
 }
 
-func NewBridgeToken(text string, expecting, in []string, single bool, span Span) *Token {
+func NewBridgeToken(text string, expecting, in []string, arity Arity, span Span) *Token {
 	return &Token{
 		Text:      text,
 		Type:      BridgeToken,
 		Span:      span,
 		Expecting: expecting,
 		In:        in,
-		Single:    &single,
+		Arity:     &arity,
 	}
 }
 

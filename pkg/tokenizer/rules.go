@@ -225,36 +225,42 @@ func getDefaultStartTokens() map[string]StartTokenData {
 		"def": {
 			Expecting: []string{"=>>"},
 			ClosedBy:  []string{"end", "enddef"},
-			Single:    true,
+			Arity:     One,
 		},
 		"if": {
 			Expecting: []string{"then"},
 			ClosedBy:  []string{"end", "endif"},
-			Single:    true,
+			Arity:     One,
 		},
 		"ifnot": {
 			Expecting: []string{"then"},
 			ClosedBy:  []string{"end", "endifnot"},
+			Arity:     One,
 		},
 		"fn": {
 			Expecting: []string{},
 			ClosedBy:  []string{"end", "endfn"},
+			Arity:     One,
 		},
 		"class": {
 			Expecting: []string{},
 			ClosedBy:  []string{"end", "endclass"},
+			Arity:     One,
 		},
 		"for": {
 			Expecting: []string{"do"},
 			ClosedBy:  []string{"end", "endfor"},
+			Arity:     One,
 		},
 		"try": {
 			Expecting: []string{"catch", "else"},
 			ClosedBy:  []string{"end", "endtry"},
+			Arity:     Many,
 		},
 		"transaction": {
 			Expecting: []string{"catch", "else"},
 			ClosedBy:  []string{"end", "endtransaction"},
+			Arity:     Many,
 		},
 	}
 }
