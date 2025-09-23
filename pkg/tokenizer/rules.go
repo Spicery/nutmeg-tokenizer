@@ -227,6 +227,11 @@ func getDefaultStartTokens() map[string]StartTokenData {
 			ClosedBy:  []string{"end", "enddef"},
 			Arity:     One,
 		},
+		"let": {
+			Expecting: []string{},
+			ClosedBy:  []string{"end", "endlet"},
+			Arity:     Many,
+		},
 		"if": {
 			Expecting: []string{"then"},
 			ClosedBy:  []string{"end", "endif"},
