@@ -38,3 +38,6 @@ tidy:
 build:
     mkdir -p bin
     go build -o bin/nutmeg-tokenizer ./cmd/nutmeg-tokenizer
+
+install:
+    go install ./cmd/nutmeg-tokenizer
