@@ -24,7 +24,7 @@ Options:
   --input <file>        Input file (defaults to stdin)
   --output <file>       Output file (defaults to stdout)
   --rules <file>        YAML rules file for custom tokenisation rules (optional)
-  --make-config         Generate default configuration YAML to stdout
+  --make-rules          Generate default rules YAML to stdout
   --exit0               Exit with code 0 even on tokenisation errors (suppress stderr)
 
 Examples:
@@ -33,7 +33,7 @@ Examples:
   nutmeg-tokenizer --output tokens.json              # Read from stdin, write to file
   nutmeg-tokenizer --input source.nutmeg --output tokens.json  # Read from file, write to file
   nutmeg-tokenizer --rules custom.yaml --input source.nutmeg   # Use custom rules
-  nutmeg-tokenizer --make-config                     # Generate default configuration
+  nutmeg-tokenizer --make-rules                      # Generate default rules configuration
   echo "def foo end" | nutmeg-tokenizer              # Read from stdin, write to stdout
 
 The tokenizer outputs one JSON token object per line.
@@ -42,7 +42,7 @@ See docs/rules_file.md for information about custom rules files.
 )
 
 func main() {
-	var showHelp, showVersion, exit0, makeConfig bool
+	var showHelp, showVersion, exit0, makeRules bool
 	var inputFile, outputFile, rulesFile string
 
 	flag.BoolVar(&showHelp, "h", false, "Show help")
@@ -50,7 +50,7 @@ func main() {
 	flag.BoolVar(&showVersion, "v", false, "Show version")
 	flag.BoolVar(&showVersion, "version", false, "Show version")
 	flag.BoolVar(&exit0, "exit0", false, "Exit with code 0 even on errors")
-	flag.BoolVar(&makeConfig, "make-config", false, "Generate default configuration YAML")
+	flag.BoolVar(&makeRules, "make-rules", false, "Generate default rules YAML")
 	flag.StringVar(&inputFile, "input", "", "Input file (defaults to stdin)")
 	flag.StringVar(&outputFile, "output", "", "Output file (defaults to stdout)")
 	flag.StringVar(&rulesFile, "rules", "", "YAML rules file (optional)")
@@ -71,10 +71,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	if makeConfig {
+	if makeRules {
 		err := generateDefaultConfig()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error generating default config: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error generating default rules: %v\n", err)
 			os.Exit(1)
 		}
 		os.Exit(0)
