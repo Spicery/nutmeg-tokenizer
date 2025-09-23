@@ -537,24 +537,10 @@ func (t *Tokenizer) matchCustomRules() *Token {
 		return nil // No custom rules
 	}
 
-	// Determine the next token text using proper tokenization rules
-	var text string
-
 	// Check for alphanumeric + underbar sequences
 	// fmt.Println("Custom rules check at position", t.position, "char:", string(t.input[t.position]))
-	is_identifier := false
-	if match := identifierRegex.FindString(t.input[t.position:]); match != "" {
-		text = match
-		is_identifier = true
-	} else if match := operatorRegex.FindString(t.input[t.position:]); match != "" {
-		// Check for sign character sequences
-		text = match
-	} else if t.position < len(t.input) {
-		// Everything else is a single character
-		r, size := utf8.DecodeRuneInString(t.input[t.position:])
-		text = string(r)
-		_ = size // We'll use len(text) for advancing
-	} else {
+	is_identifier, text, ok := nextIdOrOp(t)
+	if !ok {
 		return nil
 	}
 
@@ -635,6 +621,30 @@ func (t *Tokenizer) matchCustomRules() *Token {
 	}
 
 	return nil
+}
+
+// nextIdOrOp is a helper function that attempts to match an identifier or operator token.
+// It returns three values:
+// - A boolean indicating if the matched token is an identifier.
+// - The matched text.
+// - A boolean indicating if a match was found.
+func nextIdOrOp(t *Tokenizer) (bool, string, bool) {
+	if match := identifierRegex.FindString(t.input[t.position:]); match != "" {
+		text := match
+		return true, text, true
+	}
+	if match := operatorRegex.FindString(t.input[t.position:]); match != "" {
+		// Check for sign character sequences
+		text := match
+		return false, text, true
+	}
+	if t.position < len(t.input) {
+		// Everything else is a single character
+		r, _ := utf8.DecodeRuneInString(t.input[t.position:])
+		text := string(r)
+		return false, text, true
+	}
+	return false, "", false
 }
 
 // advance moves the position forward and updates line/column tracking.
