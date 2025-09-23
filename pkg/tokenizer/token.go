@@ -233,7 +233,7 @@ func NewBridgeToken(text string, expecting, in []string, arity Arity, span Span)
 }
 
 // NewWildcardBridgeToken creates a wildcard bridge token with copied attributes.
-func NewWildcardBridgeToken(text, expectedText string, expecting, in []string, span Span) *Token {
+func NewWildcardBridgeToken(text, expectedText string, expecting, in []string, arity Arity, span Span) *Token {
 	return &Token{
 		Text:      text,
 		Type:      BridgeToken,
@@ -241,6 +241,7 @@ func NewWildcardBridgeToken(text, expectedText string, expecting, in []string, s
 		Expecting: expecting,
 		In:        in,
 		Alias:     &expectedText,
+		Arity:     &arity,
 	}
 }
 

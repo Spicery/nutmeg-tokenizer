@@ -40,37 +40,7 @@ type StartTokenData struct {
 type BridgeTokenData struct {
 	Expecting []string
 	In        []string
-}
-
-var bridgeTokens = map[string]BridgeTokenData{
-	"=>>": {
-		Expecting: []string{"do"},
-		In:        []string{},
-	},
-	"do": {
-		Expecting: []string{},
-		In:        []string{"for", "def"},
-	},
-	"then": {
-		Expecting: []string{"else", "elseif", "elseifnot", "catch"},
-		In:        []string{"try", "if"},
-	},
-	"else": {
-		Expecting: []string{},
-		In:        []string{"if", "try"},
-	},
-	"catch": {
-		Expecting: []string{"then", ":"},
-		In:        []string{"try"},
-	},
-	"elseif": {
-		Expecting: []string{"then", ":"},
-		In:        []string{"if"},
-	},
-	"elseifnot": {
-		Expecting: []string{"then", ":"},
-		In:        []string{"if"},
-	},
+	Arity     Arity
 }
 
 // Base precedence values for operator characters (from operators.md)
@@ -189,23 +159,7 @@ func (t *Tokenizer) addTokenAndManageStack(token *Token) error {
 		// Update expecting for bridge tokens based on their attributes
 		if token.Expecting != nil {
 			// If the token has explicit expecting, replace current expectations
-			t.popExpecting() // Remove current expectations			}
-			t.pushExpecting(token.Expecting)
-		} else {
-			// For bridge tokens without explicit expecting, use defaults.
-			switch token.Text {
-			case "=>>":
-				// After =>> we expect do
-				t.replaceExpecting([]string{"do"})
-			case "do":
-				// After do in "for x do" or "def f(x) =>> do", we expect end
-				t.replaceExpecting([]string{"end"})
-			default:
-				// For other bridge tokens, check if they have their own expectations
-				if bridgeData, exists := bridgeTokens[token.Text]; exists {
-					t.replaceExpecting(bridgeData.Expecting)
-				}
-			}
+			t.replaceExpecting(token.Expecting)
 		}
 	}
 	return nil
@@ -575,7 +529,7 @@ func (t *Tokenizer) matchCustomRules() *Token {
 			if bridgeData, exists := t.rules.BridgeTokens[expectedText]; exists {
 				// Create a wildcard token that copies attributes from the expected bridge
 				t.advance(len(text))
-				return NewWildcardBridgeToken(text, expectedText, bridgeData.Expecting, bridgeData.In, span)
+				return NewWildcardBridgeToken(text, expectedText, bridgeData.Expecting, bridgeData.In, bridgeData.Arity, span)
 			}
 		}
 

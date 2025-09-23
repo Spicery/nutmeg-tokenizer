@@ -270,30 +270,37 @@ func getDefaultBridgeTokens() map[string]BridgeTokenData {
 		"=>>": {
 			Expecting: []string{"do"},
 			In:        []string{"def"},
+			Arity:     Many,
 		},
 		"do": {
 			Expecting: []string{},
 			In:        []string{"def", "for"},
+			Arity:     Many,
 		},
 		"then": {
 			Expecting: []string{"elseif", "else"},
 			In:        []string{"if", "ifnot"},
+			Arity:     Many,
 		},
 		"elseif": {
 			Expecting: []string{"then"},
 			In:        []string{"if", "ifnot"},
+			Arity:     One,
 		},
 		"elseifnot": {
 			Expecting: []string{"then"},
 			In:        []string{"if", "ifnot"},
+			Arity:     Many,
 		},
 		"else": {
 			Expecting: []string{},
 			In:        []string{"if", "ifnot"},
+			Arity:     Many,
 		},
 		"catch": {
 			Expecting: []string{},
 			In:        []string{"try"},
+			Arity:     One,
 		},
 	}
 }

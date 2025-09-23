@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/spicery/nutmeg-tokenizer/pkg/tokenizer"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -23,6 +24,7 @@ Options:
   --input <file>        Input file (defaults to stdin)
   --output <file>       Output file (defaults to stdout)
   --rules <file>        YAML rules file for custom tokenisation rules (optional)
+  --make-config         Generate default configuration YAML to stdout
   --exit0               Exit with code 0 even on tokenisation errors (suppress stderr)
 
 Examples:
@@ -31,6 +33,7 @@ Examples:
   nutmeg-tokenizer --output tokens.json              # Read from stdin, write to file
   nutmeg-tokenizer --input source.nutmeg --output tokens.json  # Read from file, write to file
   nutmeg-tokenizer --rules custom.yaml --input source.nutmeg   # Use custom rules
+  nutmeg-tokenizer --make-config                     # Generate default configuration
   echo "def foo end" | nutmeg-tokenizer              # Read from stdin, write to stdout
 
 The tokenizer outputs one JSON token object per line.
@@ -39,7 +42,7 @@ See docs/rules_file.md for information about custom rules files.
 )
 
 func main() {
-	var showHelp, showVersion, exit0 bool
+	var showHelp, showVersion, exit0, makeConfig bool
 	var inputFile, outputFile, rulesFile string
 
 	flag.BoolVar(&showHelp, "h", false, "Show help")
@@ -47,6 +50,7 @@ func main() {
 	flag.BoolVar(&showVersion, "v", false, "Show version")
 	flag.BoolVar(&showVersion, "version", false, "Show version")
 	flag.BoolVar(&exit0, "exit0", false, "Exit with code 0 even on errors")
+	flag.BoolVar(&makeConfig, "make-config", false, "Generate default configuration YAML")
 	flag.StringVar(&inputFile, "input", "", "Input file (defaults to stdin)")
 	flag.StringVar(&outputFile, "output", "", "Output file (defaults to stdout)")
 	flag.StringVar(&rulesFile, "rules", "", "YAML rules file (optional)")
@@ -64,6 +68,15 @@ func main() {
 
 	if showVersion {
 		fmt.Printf("nutmeg-tokenizer version %s\n", version)
+		os.Exit(0)
+	}
+
+	if makeConfig {
+		err := generateDefaultConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error generating default config: %v\n", err)
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 
@@ -181,4 +194,72 @@ func readFromFile(filename string) (string, error) {
 		return "", err
 	}
 	return string(bytes), nil
+}
+
+// generateDefaultConfig outputs the default configuration in YAML format to stdout.
+func generateDefaultConfig() error {
+	rules := tokenizer.DefaultRules()
+
+	// Convert TokenizerRules to RulesFile format
+	rulesFile := &tokenizer.RulesFile{}
+
+	// Convert bracket rules
+	for text, closedBy := range rules.DelimiterMappings {
+		props := rules.DelimiterProperties[text]
+		rulesFile.Bracket = append(rulesFile.Bracket, tokenizer.BracketRule{
+			Text:      text,
+			ClosedBy:  closedBy,
+			InfixPrec: props.InfixPrec,
+			Prefix:    props.Prefix,
+		})
+	}
+
+	// Convert prefix rules
+	for text := range rules.PrefixTokens {
+		rulesFile.Prefix = append(rulesFile.Prefix, tokenizer.PrefixRule{
+			Text: text,
+		})
+	}
+
+	// Convert start rules
+	for text, data := range rules.StartTokens {
+		rulesFile.Start = append(rulesFile.Start, tokenizer.StartRule{
+			Text:      text,
+			ClosedBy:  data.ClosedBy,
+			Expecting: data.Expecting, // Include the expecting field as it exists in StartTokenData
+		})
+	}
+
+	// Convert bridge rules
+	for text, data := range rules.BridgeTokens {
+		rulesFile.Bridge = append(rulesFile.Bridge, tokenizer.BridgeRule{
+			Text:      text,
+			Expecting: data.Expecting,
+			In:        data.In,
+		})
+	}
+
+	// Convert wildcard rules
+	for text := range rules.WildcardTokens {
+		rulesFile.Wildcard = append(rulesFile.Wildcard, tokenizer.WildcardRule{
+			Text: text,
+		})
+	}
+
+	// Convert operator rules
+	for text, precedence := range rules.OperatorPrecedences {
+		rulesFile.Operator = append(rulesFile.Operator, tokenizer.OperatorRule{
+			Text:       text,
+			Precedence: precedence,
+		})
+	}
+
+	// Marshal to YAML and output to stdout
+	yamlBytes, err := yaml.Marshal(rulesFile)
+	if err != nil {
+		return fmt.Errorf("failed to marshal rules to YAML: %w", err)
+	}
+
+	fmt.Print(string(yamlBytes))
+	return nil
 }

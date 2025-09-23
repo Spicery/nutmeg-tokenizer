@@ -20,13 +20,19 @@ start:
     closed_by: ["endloop"]
     arity: 1
 
-label:
+bridge:
   - text: "where"
+    expecting: []
+    in: ["for"]
   - text: "such_that"
-
-compound:
+    expecting: []
+    in: ["for"]
   - text: "else_if"
+    expecting: []
+    in: ["if"]
   - text: "or_else"
+    expecting: []
+    in: ["if"]
 
 wildcard:
   - text: "*"
