@@ -115,7 +115,7 @@ func (t *Tokenizer) getCurrentlyExpected() []string {
 // addTokenAndManageStack adds a token to the tokens slice and manages the expecting stack.
 func (t *Tokenizer) addTokenAndManageStack(token *Token) error {
 	// Check if numeric token is valid before adding it
-	if token.Type == NumericLiteral {
+	if token.Type == NumericLiteralTokenType {
 		if valid, reason := token.isValidNumber(); !valid {
 			// Replace the token with an exception token
 			exceptionToken := NewExceptionToken(token.Text, "invalid numeric literal: "+reason, token.Span)
@@ -140,22 +140,22 @@ func (t *Tokenizer) addTokenAndManageStack(token *Token) error {
 	t.tokens = append(t.tokens, token)
 
 	// If this is an exception token, stop processing
-	if token.Type == ExceptionToken {
+	if token.Type == ExceptionTokenType {
 		return fmt.Errorf("tokenisation error at line %d, column %d: %s",
 			token.Span.Start.Line, token.Span.Start.Col, *token.Reason)
 	}
 
 	// Manage the expecting stack based on token type and text
 	switch token.Type {
-	case StartToken:
+	case StartTokenType:
 		// Push expected tokens for this start token
 		if len(token.Expecting) > 0 {
 			t.pushExpecting(token.Expecting)
 		}
-	case EndToken:
+	case EndTokenType:
 		// Pop the expecting stack
 		t.popExpecting()
-	case BridgeToken:
+	case BridgeTokenType:
 		// Update expecting for bridge tokens based on their attributes
 		if token.Expecting != nil {
 			// If the token has explicit expecting, replace current expectations
@@ -218,7 +218,7 @@ func (t *Tokenizer) nextToken() error {
 	end := Position{Line: t.line, Col: t.column + size}
 	span := Span{Start: start, End: end}
 
-	token := NewToken(text, UnclassifiedToken, span)
+	token := NewToken(text, UnclassifiedTokenType, span)
 	if sawNewlineBefore {
 		token.LnBefore = &sawNewlineBefore
 	}
@@ -511,7 +511,7 @@ func (t *Tokenizer) matchCustomRules() *Token {
 
 			// If it's an identifier and no special type, treat as VariableToken
 			t.advance(len(text))
-			return NewToken(text, VariableToken, span)
+			return NewToken(text, VariableTokenType, span)
 		}
 		return nil // No matching custom rule
 	}
@@ -535,7 +535,7 @@ func (t *Tokenizer) matchCustomRules() *Token {
 
 		// No context available, create unclassified token
 		t.advance(len(text))
-		return NewToken(text, UnclassifiedToken, span)
+		return NewToken(text, UnclassifiedTokenType, span)
 
 	case CustomStart:
 		startData := entry.Data.(StartTokenData)
@@ -544,7 +544,7 @@ func (t *Tokenizer) matchCustomRules() *Token {
 
 	case CustomEnd:
 		t.advance(len(text))
-		return NewToken(text, EndToken, span)
+		return NewToken(text, EndTokenType, span)
 
 	case CustomBridge:
 		bridgeData := entry.Data.(BridgeTokenData)
@@ -553,7 +553,11 @@ func (t *Tokenizer) matchCustomRules() *Token {
 
 	case CustomPrefix:
 		t.advance(len(text))
-		return NewToken(text, PrefixToken, span)
+		return NewToken(text, PrefixTokenType, span)
+
+	case CustomMark:
+		t.advance(len(text))
+		return NewToken(text, MarkTokenType, span)
 
 	case CustomOperator:
 		precedence := entry.Data.([3]int)
@@ -571,7 +575,7 @@ func (t *Tokenizer) matchCustomRules() *Token {
 
 	case CustomCloseDelimiter:
 		t.advance(len(text))
-		return NewToken(text, CloseDelimiter, span)
+		return NewToken(text, CloseDelimiterTokenType, span)
 	}
 
 	return nil

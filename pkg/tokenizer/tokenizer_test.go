@@ -68,7 +68,7 @@ func TestStringTokens(t *testing.T) {
 			}
 
 			token := tokens[0]
-			if token.Type != StringLiteral {
+			if token.Type != StringLiteralTokenType {
 				t.Errorf("Expected string token, got %s", token.Type)
 			}
 
@@ -170,7 +170,7 @@ func TestNumericTokens(t *testing.T) {
 			}
 
 			token := tokens[0]
-			if token.Type != NumericLiteral {
+			if token.Type != NumericLiteralTokenType {
 				t.Errorf("Expected numeric token, got %s", token.Type)
 			}
 
@@ -288,7 +288,7 @@ func TestEnhancedNumericEdgeCases(t *testing.T) {
 			}
 
 			token := tokens[0]
-			if token.Type != NumericLiteral {
+			if token.Type != NumericLiteralTokenType {
 				t.Errorf("Expected numeric token, got %s", token.Type)
 				return
 			}
@@ -390,7 +390,7 @@ func TestNumericWithUnderscores(t *testing.T) {
 			}
 
 			token := tokens[0]
-			if token.Type != NumericLiteral {
+			if token.Type != NumericLiteralTokenType {
 				t.Errorf("Expected numeric token, got %s", token.Type)
 			}
 
@@ -487,7 +487,7 @@ func TestBalancedTernaryTokens(t *testing.T) {
 			}
 
 			token := tokens[0]
-			if token.Type != NumericLiteral {
+			if token.Type != NumericLiteralTokenType {
 				t.Errorf("Expected numeric token, got %s", token.Type)
 			}
 
@@ -532,13 +532,13 @@ func TestStartTokens(t *testing.T) {
 		expectedType TokenType
 		expecting    []string
 	}{
-		{"def", StartToken, []string{"=>>"}},
-		{"if", StartToken, []string{"then"}},
-		{"class", StartToken, []string{}},
-		{"fn", StartToken, []string{}},
-		{"for", StartToken, []string{"do"}},
-		{"try", StartToken, []string{"catch", "else"}},
-		{"transaction", StartToken, []string{"catch", "else"}},
+		{"def", StartTokenType, []string{"=>>"}},
+		{"if", StartTokenType, []string{"then"}},
+		{"class", StartTokenType, []string{}},
+		{"fn", StartTokenType, []string{"=>>"}},
+		{"for", StartTokenType, []string{"do"}},
+		{"try", StartTokenType, []string{"catch", "else"}},
+		{"transaction", StartTokenType, []string{"catch", "else"}},
 	}
 
 	for _, tt := range tests {
@@ -602,7 +602,7 @@ func TestOperatorTokens(t *testing.T) {
 			}
 
 			token := tokens[0]
-			if token.Type != OperatorToken {
+			if token.Type != OperatorTokenType {
 				t.Errorf("Expected operator token, got %s", token.Type)
 			}
 
@@ -626,12 +626,12 @@ func TestDelimiterTokens(t *testing.T) {
 		infixPrec    int
 		isPrefix     bool
 	}{
-		{"(", OpenDelimiter, []string{")"}, 2020, true},
-		{"[", OpenDelimiter, []string{"]"}, 2030, true},
-		{"{", OpenDelimiter, []string{"}"}, 2040, true}, // Updated: now supports infix usage for f{x} syntax
-		{")", CloseDelimiter, nil, 0, false},
-		{"]", CloseDelimiter, nil, 0, false},
-		{"}", CloseDelimiter, nil, 0, false},
+		{"(", OpenDelimiterTokenType, []string{")"}, 2020, true},
+		{"[", OpenDelimiterTokenType, []string{"]"}, 2030, true},
+		{"{", OpenDelimiterTokenType, []string{"}"}, 2040, true}, // Updated: now supports infix usage for f{x} syntax
+		{")", CloseDelimiterTokenType, nil, 0, false},
+		{"]", CloseDelimiterTokenType, nil, 0, false},
+		{"}", CloseDelimiterTokenType, nil, 0, false},
 	}
 
 	for _, tt := range tests {
@@ -654,7 +654,7 @@ func TestDelimiterTokens(t *testing.T) {
 				t.Errorf("Expected token type %s, got %s", tt.expectedType, token.Type)
 			}
 
-			if tt.expectedType == OpenDelimiter {
+			if tt.expectedType == OpenDelimiterTokenType {
 				if len(token.ClosedBy) != len(tt.closedBy) {
 					t.Errorf("Expected closed by %v, got %v", tt.closedBy, token.ClosedBy)
 				} else {
@@ -683,31 +683,31 @@ func TestKeywordClassification(t *testing.T) {
 		expectedType TokenType
 	}{
 		// Bridge tokens (L)
-		{"=>>", BridgeToken},
-		{"do", BridgeToken},
-		{"then", BridgeToken},
-		{"else", BridgeToken},
+		{"=>>", BridgeTokenType},
+		{"do", BridgeTokenType},
+		{"then", BridgeTokenType},
+		{"else", BridgeTokenType},
 
 		// Unclassified tokens (U)
-		{":", UnclassifiedToken}, // bare wildcard without context
+		{":", UnclassifiedTokenType}, // bare wildcard without context
 
 		// Compound tokens (C)
-		{"catch", BridgeToken},
-		{"elseif", BridgeToken},
-		{"elseifnot", BridgeToken},
+		{"catch", BridgeTokenType},
+		{"elseif", BridgeTokenType},
+		{"elseifnot", BridgeTokenType},
 
 		// Prefix tokens (P)
-		{"return", PrefixToken},
-		{"yield", PrefixToken},
+		{"return", PrefixTokenType},
+		{"yield", PrefixTokenType},
 
 		// End tokens (E)
-		{"end", EndToken},
-		{"enddef", EndToken},
-		{"endclass", EndToken},
+		{"end", EndTokenType},
+		{"enddef", EndTokenType},
+		{"endclass", EndTokenType},
 
 		// Variable tokens (V) - should default to this for unknown identifiers
-		{"myVariable", VariableToken},
-		{"unknown", VariableToken},
+		{"myVariable", VariableTokenType},
+		{"unknown", VariableTokenType},
 	}
 
 	for _, tt := range tests {
@@ -823,7 +823,7 @@ func TestCustomRulesWildcard(t *testing.T) {
 		t.Errorf("Expected wildcard token text to be '***', got '%s'", wildcardToken.Text)
 	}
 
-	if wildcardToken.Type != BridgeToken {
+	if wildcardToken.Type != BridgeTokenType {
 		t.Errorf("Expected wildcard token type to be Bridge, got %s", wildcardToken.Type)
 	}
 
@@ -919,7 +919,7 @@ func TestExceptionTokens(t *testing.T) {
 			}
 
 			token := tokens[0]
-			if token.Type != ExceptionToken {
+			if token.Type != ExceptionTokenType {
 				t.Errorf("Expected exception token, got %s", token.Type)
 			}
 		})

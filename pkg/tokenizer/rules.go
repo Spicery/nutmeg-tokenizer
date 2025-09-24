@@ -15,6 +15,11 @@ type RulesFile struct {
 	Bridge   []BridgeRule   `yaml:"bridge"`
 	Wildcard []WildcardRule `yaml:"wildcard"`
 	Operator []OperatorRule `yaml:"operator"`
+	Mark     []MarkRule     `yaml:"mark"`
+}
+
+type MarkRule struct {
+	Text string `yaml:"text"`
 }
 
 // BracketRule represents a bracket token rule
@@ -75,6 +80,7 @@ const (
 	CustomOperator
 	CustomOpenDelimiter
 	CustomCloseDelimiter
+	CustomMark
 )
 
 // CustomRuleEntry holds the rule type and any associated data
@@ -92,6 +98,7 @@ type TokenizerRules struct {
 	DelimiterProperties map[string]DelimiterProp
 	WildcardTokens      map[string]bool
 	OperatorPrecedences map[string][3]int // [prefix, infix, postfix]
+	MarkTokens          map[string]bool
 
 	// Precomputed lookup map for efficient matching
 	TokenLookup map[string]CustomRuleEntry
@@ -107,6 +114,7 @@ func DefaultRules() *TokenizerRules {
 		DelimiterProperties: getDefaultDelimiterProperties(),
 		WildcardTokens:      getDefaultWildcardTokens(),
 		OperatorPrecedences: getDefaultOperatorPrecedences(),
+		MarkTokens:          map[string]bool{",": true, ";": true},
 	}
 
 	// Build the precomputed lookup map
@@ -154,6 +162,14 @@ func ApplyRulesToDefaults(rules *RulesFile) (*TokenizerRules, error) {
 		tokenizerRules.PrefixTokens = make(map[string]bool)
 		for _, rule := range rules.Prefix {
 			tokenizerRules.PrefixTokens[rule.Text] = true
+		}
+	}
+
+	// Apply mark rules
+	if len(rules.Mark) > 0 {
+		tokenizerRules.MarkTokens = make(map[string]bool)
+		for _, rule := range rules.Mark {
+			tokenizerRules.MarkTokens[rule.Text] = true
 		}
 	}
 
@@ -248,7 +264,7 @@ func getDefaultStartTokens() map[string]StartTokenData {
 			Arity:     One,
 		},
 		"fn": {
-			Expecting: []string{},
+			Expecting: []string{"=>>"},
 			ClosedBy:  []string{"end", "endfn"},
 			Arity:     One,
 		},
@@ -278,17 +294,17 @@ func getDefaultStartTokens() map[string]StartTokenData {
 func getDefaultBridgeTokens() map[string]BridgeTokenData {
 	return map[string]BridgeTokenData{
 		"=>>": {
-			Expecting: []string{"do"},
+			Expecting: []string{"end", "enddef", "endfn"},
 			In:        []string{"def"},
 			Arity:     Many,
 		},
 		"do": {
-			Expecting: []string{},
+			Expecting: []string{"end", "endfor"},
 			In:        []string{"def", "for"},
 			Arity:     Many,
 		},
 		"then": {
-			Expecting: []string{"elseif", "else"},
+			Expecting: []string{"elseif", "else", "end", "endif", "endifnot"},
 			In:        []string{"if", "ifnot"},
 			Arity:     Many,
 		},
@@ -303,7 +319,7 @@ func getDefaultBridgeTokens() map[string]BridgeTokenData {
 			Arity:     Many,
 		},
 		"else": {
-			Expecting: []string{},
+			Expecting: []string{"end", "endif", "endifnot"},
 			In:        []string{"if", "ifnot"},
 			Arity:     Many,
 		},
@@ -398,6 +414,13 @@ func (rules *TokenizerRules) BuildTokenLookup() error {
 	// Add prefix tokens
 	for token := range rules.PrefixTokens {
 		if err := addToken(token, CustomPrefix, "prefix", nil); err != nil {
+			return err
+		}
+	}
+
+	// Add mark tokens
+	for token := range rules.MarkTokens {
+		if err := addToken(token, CustomMark, "mark", nil); err != nil {
 			return err
 		}
 	}

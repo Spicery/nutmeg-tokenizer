@@ -36,4 +36,6 @@ The end tokens are always `end` or `end{START}`
 - return
 - yield
 
+## Marks (M)
 
+- `,` and `;`

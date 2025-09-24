@@ -10,22 +10,23 @@ type TokenType string
 
 const (
 	// Literal constants
-	NumericLiteral TokenType = "n" // Numeric literals with radix support
-	StringLiteral  TokenType = "s" // String literals with quotes and escapes
+	NumericLiteralTokenType TokenType = "n" // Numeric literals with radix support
+	StringLiteralTokenType  TokenType = "s" // String literals with quotes and escapes
 
 	// Identifier tokens
-	StartToken    TokenType = "S" // Form start tokens (def, if, while)
-	EndToken      TokenType = "E" // Form end tokens (end, endif, endwhile)
-	BridgeToken   TokenType = "B" // Bridge tokens (=>, =>, else, catch)
-	PrefixToken   TokenType = "P" // Prefix operators (return, yield)
-	VariableToken TokenType = "V" // Variable identifiers
+	StartTokenType    TokenType = "S" // Form start tokens (def, if, while)
+	EndTokenType      TokenType = "E" // Form end tokens (end, endif, endwhile)
+	BridgeTokenType   TokenType = "B" // Bridge tokens (=>, =>, else, catch)
+	PrefixTokenType   TokenType = "P" // Prefix operators (return, yield)
+	VariableTokenType TokenType = "V" // Variable identifiers
 
 	// Other tokens
-	OperatorToken     TokenType = "O" // Infix/postfix operators
-	OpenDelimiter     TokenType = "[" // Opening brackets/braces/parentheses
-	CloseDelimiter    TokenType = "]" // Closing brackets/braces/parentheses
-	UnclassifiedToken TokenType = "U" // Unclassified tokens
-	ExceptionToken    TokenType = "X" // Exception tokens for invalid constructs
+	OperatorTokenType       TokenType = "O" // Infix/postfix operators
+	OpenDelimiterTokenType  TokenType = "[" // Opening brackets/braces/parentheses
+	CloseDelimiterTokenType TokenType = "]" // Closing brackets/braces/parentheses
+	MarkTokenType           TokenType = "M" // Marks (commas, semicolons)
+	UnclassifiedTokenType   TokenType = "U" // Unclassified tokens
+	ExceptionTokenType      TokenType = "X" // Exception tokens for invalid constructs
 )
 
 // Position represents a line and column position in the source file.
@@ -118,7 +119,7 @@ func NewToken(text string, tokenType TokenType, span Span) *Token {
 func NewStringToken(text, value string, span Span) *Token {
 	return &Token{
 		Text:  text,
-		Type:  StringLiteral,
+		Type:  StringLiteralTokenType,
 		Span:  span,
 		Value: &value,
 	}
@@ -128,7 +129,7 @@ func NewStringToken(text, value string, span Span) *Token {
 func NewNumericToken(text string, radix string, base int, mantissa, fraction string, exponent int, span Span) *Token {
 	token := &Token{
 		Text:     text,
-		Type:     NumericLiteral,
+		Type:     NumericLiteralTokenType,
 		Span:     span,
 		Radix:    &radix,
 		Base:     &base,
@@ -152,7 +153,7 @@ func NewBalancedTernaryToken(text string, mantissa, fraction string, exponent in
 	balanced := true
 	token := &Token{
 		Text:     text,
-		Type:     NumericLiteral,
+		Type:     NumericLiteralTokenType,
 		Span:     span,
 		Radix:    &radixPrefix,
 		Base:     &base,
@@ -174,7 +175,7 @@ func NewBalancedTernaryToken(text string, mantissa, fraction string, exponent in
 func NewStartToken(text string, expecting, closedBy []string, span Span, arity Arity) *Token {
 	return &Token{
 		Text:      text,
-		Type:      StartToken,
+		Type:      StartTokenType,
 		Span:      span,
 		Expecting: expecting,
 		ClosedBy:  closedBy,
@@ -186,7 +187,7 @@ func NewStartToken(text string, expecting, closedBy []string, span Span, arity A
 func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token {
 	token := &Token{
 		Text: text,
-		Type: OperatorToken,
+		Type: OperatorTokenType,
 		Span: span,
 	}
 
@@ -203,7 +204,7 @@ func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token
 func NewDelimiterToken(text string, closedBy []string, isInfix int, isPrefix bool, span Span) *Token {
 	return &Token{
 		Text:            text,
-		Type:            OpenDelimiter,
+		Type:            OpenDelimiterTokenType,
 		Span:            span,
 		ClosedBy:        closedBy,
 		InfixPrecedence: &isInfix,
@@ -224,7 +225,7 @@ func NewExprBridgeToken(text string, expecting, in []string, span Span) *Token {
 func NewBridgeToken(text string, expecting, in []string, arity Arity, span Span) *Token {
 	return &Token{
 		Text:      text,
-		Type:      BridgeToken,
+		Type:      BridgeTokenType,
 		Span:      span,
 		Expecting: expecting,
 		In:        in,
@@ -236,7 +237,7 @@ func NewBridgeToken(text string, expecting, in []string, arity Arity, span Span)
 func NewWildcardBridgeToken(text, expectedText string, expecting, in []string, arity Arity, span Span) *Token {
 	return &Token{
 		Text:      text,
-		Type:      BridgeToken,
+		Type:      BridgeTokenType,
 		Span:      span,
 		Expecting: expecting,
 		In:        in,
@@ -248,7 +249,7 @@ func NewWildcardBridgeToken(text, expectedText string, expecting, in []string, a
 func NewUnclassifiedToken(text string, span Span) *Token {
 	return &Token{
 		Text: text,
-		Type: UnclassifiedToken,
+		Type: UnclassifiedTokenType,
 		Span: span,
 	}
 }
@@ -257,7 +258,7 @@ func NewUnclassifiedToken(text string, span Span) *Token {
 func NewExceptionToken(text, reason string, span Span) *Token {
 	return &Token{
 		Text:   text,
-		Type:   ExceptionToken,
+		Type:   ExceptionTokenType,
 		Span:   span,
 		Reason: &reason,
 	}
@@ -265,7 +266,7 @@ func NewExceptionToken(text, reason string, span Span) *Token {
 
 // isValidNumber checks if a numeric token represents a valid number.
 func (t *Token) isValidNumber() (bool, string) {
-	if t.Type != NumericLiteral {
+	if t.Type != NumericLiteralTokenType {
 		return true, "" // Non-numeric tokens are always valid
 	}
 
