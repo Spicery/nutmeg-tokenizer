@@ -216,7 +216,12 @@ func getDefaultOperatorPrecedences() map[string][3]int {
 	updateOperatorPrecedence(m, "<=")
 	updateOperatorPrecedence(m, ">=")
 	updateOperatorPrecedence(m, "==")
+	updateOperatorPrecedence(m, "..<")
+	updateOperatorPrecedence(m, "..=")
 	updateOperatorPrecedence(m, ":=")
+	updateOperatorPrecedence(m, "<-")
+	updateOperatorPrecedence(m, "<--")
+	m["in"] = [3]int{0, 3000, 0}
 	return m
 }
 
@@ -314,6 +319,9 @@ func getDefaultPrefixTokens() map[string]bool {
 	return map[string]bool{
 		"return": true,
 		"yield":  true,
+		"const":  true,
+		"var":    true,
+		"val":    true,
 	}
 }
 

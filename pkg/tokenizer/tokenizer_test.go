@@ -627,7 +627,7 @@ func TestDelimiterTokens(t *testing.T) {
 		isPrefix     bool
 	}{
 		{"(", OpenDelimiter, []string{")"}, 2020, true},
-		{"[", OpenDelimiter, []string{"]"}, 2030, false},
+		{"[", OpenDelimiter, []string{"]"}, 2030, true},
 		{"{", OpenDelimiter, []string{"}"}, 2040, true}, // Updated: now supports infix usage for f{x} syntax
 		{")", CloseDelimiter, nil, 0, false},
 		{"]", CloseDelimiter, nil, 0, false},

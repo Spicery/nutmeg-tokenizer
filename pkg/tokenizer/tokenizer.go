@@ -23,7 +23,7 @@ type Tokenizer struct {
 // Regular expressions for token matching
 var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
-	operatorRegex   = regexp.MustCompile(`^[\*/%\+\-<>~!&^|?=:]+`)
+	operatorRegex   = regexp.MustCompile(`^[.\*/%\+\-<>~!&^|?=:]+`)
 	radixRegex      = regexp.MustCompile(`^(\d+[xobtr])([0-9A-Z]+(?:_[0-9A-Z]+)*)(\.[0-9A-Z]*(?:_[0-9A-Z]+)*)?(?:e([+-]?\d+))?`)
 	decimalRegex    = regexp.MustCompile(`^(\d+(?:_\d+)*)(\.\d*(?:_\d+)*)?(?:e([+-]?\d+))?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
