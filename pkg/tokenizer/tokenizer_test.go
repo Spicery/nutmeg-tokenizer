@@ -580,7 +580,7 @@ func TestOperatorTokens(t *testing.T) {
 		input              string
 		expectedPrecedence [3]int // [prefix, infix, postfix]
 	}{
-		{"+", [3]int{0, 2080, 0}},  // + has base precedence 40, only infix enabled (40+2000=2040)
+		{"+", [3]int{80, 2080, 0}}, // + has base precedence 40, only infix enabled (40+2000=2040)
 		{"-", [3]int{90, 2090, 0}}, // - has base precedence 50, both prefix (50) and infix (50+2000=2050) enabled
 		{"*", [3]int{0, 2050, 0}},  // * has base precedence 10, only infix enabled (10+2000=2010)
 		{"==", [3]int{0, 2179, 0}}, // = has base precedence 140, repeated so 139, only infix enabled (139+2000=2139)

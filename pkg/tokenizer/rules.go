@@ -489,7 +489,7 @@ func calculateOperatorPrecedence(operator string) (prefix, infix, postfix int) {
 	// - All operators have infix capability (add 2000 to base precedence)
 	// - No operators have postfix capability (set to 0)
 
-	if operator == "-" {
+	if operator == "-" || operator == "+" {
 		// Unary minus: enabled for both prefix and infix
 		prefix = basePrecedence
 		infix = basePrecedence + 2000
