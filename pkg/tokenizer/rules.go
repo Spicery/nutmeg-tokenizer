@@ -335,9 +335,9 @@ func getDefaultDelimiterProperties() map[string]DelimiterProp {
 	_, b, _ := calculateOperatorPrecedence("[")
 	_, c, _ := calculateOperatorPrecedence("{")
 	return map[string]DelimiterProp{
-		"(": {a, true},  // infix=true, prefix=true
-		"[": {b, false}, // infix=true, prefix=false
-		"{": {c, true},  // infix=false, prefix=true
+		"(": {a, true}, // infix=true, prefix=true
+		"[": {b, true}, // infix=true, prefix=false
+		"{": {c, true}, // infix=false, prefix=true
 	}
 }
 
