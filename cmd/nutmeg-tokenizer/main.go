@@ -28,7 +28,7 @@ Options:
   --exit0               Exit with code 0 even on tokenisation errors (suppress stderr)
 
 Examples:
-  nutmeg-tokenizer                                    # Read from stdin, write to stdout
+  nutmeg-tokenizer                                   # Read from stdin, write to stdout
   nutmeg-tokenizer --input source.nutmeg             # Read from file, write to stdout
   nutmeg-tokenizer --output tokens.json              # Read from stdin, write to file
   nutmeg-tokenizer --input source.nutmeg --output tokens.json  # Read from file, write to file
