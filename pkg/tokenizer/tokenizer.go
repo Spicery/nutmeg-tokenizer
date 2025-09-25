@@ -15,6 +15,9 @@ type Tokenizer struct {
 	position       int
 	line           int
 	column         int
+	markStack      []int // Stack of position markers
+	lineNoStack    []int // Array to store line numbers for each token
+	lineColStack   []int // Array to store column numbers for each token
 	tokens         []*Token
 	expectingStack [][]string      // Stack of expecting arrays for context tracking
 	rules          *TokenizerRules // Custom rules for this tokenizer instance
@@ -187,12 +190,18 @@ func (t *Tokenizer) nextToken() error {
 	start := Position{Line: t.line, Col: t.column}
 
 	// Try to match different token types
-	if token := t.matchString(); token != nil {
-		token.Span.Start = start
-		if sawNewlineBefore {
-			token.LnBefore = &sawNewlineBefore
+	{
+		token, err := t.matchString()
+		if err != nil {
+			return err
 		}
-		return t.addTokenAndManageStack(token)
+		if token != nil {
+			token.Span.Start = start
+			if sawNewlineBefore {
+				token.LnBefore = &sawNewlineBefore
+			}
+			return t.addTokenAndManageStack(token)
+		}
 	}
 
 	if token := t.matchNumeric(); token != nil {
@@ -254,62 +263,6 @@ func (t *Tokenizer) skipWhitespaceAndComments() bool {
 	}
 
 	return sawNewline
-}
-
-// matchString attempts to match a string literal.
-func (t *Tokenizer) matchString() *Token {
-	if t.position >= len(t.input) {
-		return nil
-	}
-
-	quote := t.input[t.position]
-	if quote != '"' && quote != '\'' && quote != '`' {
-		return nil
-	}
-
-	start := t.position
-	t.advance(1) // Skip opening quote
-
-	var value strings.Builder
-	escaped := false
-
-	for t.position < len(t.input) {
-		r, size := utf8.DecodeRuneInString(t.input[t.position:])
-
-		if escaped {
-			// Handle escape sequences
-			switch r {
-			case 'n':
-				value.WriteRune('\n')
-			case 't':
-				value.WriteRune('\t')
-			case 'r':
-				value.WriteRune('\r')
-			case '\\':
-				value.WriteRune('\\')
-			case '"', '\'', '`':
-				value.WriteRune(r)
-			default:
-				value.WriteRune(r)
-			}
-			escaped = false
-		} else if r == '\\' {
-			escaped = true
-		} else if byte(r) == quote {
-			t.advance(size) // Skip closing quote
-			break
-		} else {
-			value.WriteRune(r)
-		}
-
-		t.advance(size)
-	}
-
-	text := t.input[start:t.position]
-	end := Position{Line: t.line, Col: t.column}
-	span := Span{End: end}
-
-	return NewStringToken(text, value.String(), span)
 }
 
 // matchNumeric attempts to match a numeric literal.
@@ -616,4 +569,272 @@ func (t *Tokenizer) advance(n int) {
 		}
 		t.position++
 	}
+}
+
+func (t *Tokenizer) peek() (rune, bool) {
+	if t.position >= len(t.input) {
+		return rune(0), false // End of input
+	}
+	r, b := utf8.DecodeRuneInString(t.input[t.position:])
+	return r, b > 0
+}
+
+func (t *Tokenizer) tryPeekTripleOpeningQuotes() (rune, bool) {
+	return t.tryPeekTripleQuotes(true)
+}
+
+func (t *Tokenizer) tryReadTripleClosingQuotes() (rune, bool) {
+	return t.tryReadTripleQuotes(false)
+}
+
+func (t *Tokenizer) tryReadTripleOpeningQuotes() (rune, bool) {
+	return t.tryReadTripleQuotes(true)
+}
+
+func (t *Tokenizer) tryReadTripleQuotes(is_opening bool) (rune, bool) {
+	r, b := t.tryPeekTripleQuotes(is_opening)
+
+	if b {
+		// Consume all three quotes
+		t.consume() // Consume the first quote
+		t.consume() // Consume the second quote
+		t.consume() // Consume the third quote
+	}
+
+	return r, b
+}
+
+func (t *Tokenizer) tryPeekTripleQuotes(is_opening bool) (rune, bool) {
+	// Peek the first character to check if it’s a valid quote character
+	r1, ok1 := t.peek()
+	if !ok1 {
+		return 0, false // End of input
+	}
+	if is_opening {
+		if !isOpeningQuoteChar(r1) {
+			return 0, false // Invalid opening quote character
+		}
+	} else {
+		if !isClosingQuoteChar(r1) {
+			return 0, false // Invalid closing quote character
+		}
+	}
+
+	// Check if the next two characters match the first one
+	r2, ok2 := t.peekN(2)
+	r3, ok3 := t.peekN(3)
+	if !(ok2 && ok3 && r2 == r1 && r3 == r1) {
+		return 0, false // Not a triple quote
+	}
+
+	return r1, true // Successfully read triple quotes
+}
+
+func (t *Tokenizer) peekN(n int) (rune, bool) {
+	currentPos := t.position // Start at the current position
+	var r rune
+	var size int
+
+	// Iterate through the input to locate the nth rune
+	for range n {
+		if currentPos >= len(t.input) {
+			// If we reach the end of input before finding the nth rune, return false
+			return 0, false
+		}
+
+		r, size = utf8.DecodeRuneInString(t.input[currentPos:])
+		if r == utf8.RuneError {
+			// Handle invalid UTF-8 character by returning false
+			return 0, false
+		}
+
+		// Advance to the next rune
+		currentPos += size
+	}
+
+	// Return the nth rune and true (indicating success)
+	return r, true
+}
+
+func isOpeningQuoteChar(r rune) bool {
+	return r == '\'' || r == '"' || r == '`' || r == '«'
+}
+
+func isClosingQuoteChar(r rune) bool {
+	return r == '\'' || r == '"' || r == '`' || r == '»'
+}
+
+// Consume the current rune and advance the position
+func (t *Tokenizer) consume() rune {
+	r, ok := t.peek()
+	if !ok {
+		return r
+	}
+	t.position += utf8.RuneLen(r) // Move the byte position forward
+	return r
+}
+
+func (t *Tokenizer) markPosition() {
+	// Mark the current position in the input
+	t.markStack = append(t.markStack, t.position)
+	t.lineNoStack = append(t.lineNoStack, t.line)
+	t.lineColStack = append(t.lineColStack, t.column)
+}
+
+// Reset the position to the last marked position
+func (t *Tokenizer) resetPosition() {
+	// Reset the position to the last marked position
+	if len(t.markStack) == 0 {
+		return
+	}
+	n1 := len(t.markStack) - 1
+	t.position = t.markStack[n1]
+	t.line = t.lineNoStack[n1]
+	t.column = t.lineColStack[n1]
+	t.markStack = t.markStack[:n1]
+	t.lineNoStack = t.lineNoStack[:n1]
+	t.lineColStack = t.lineColStack[:n1]
+}
+
+func (t *Tokenizer) popMark() string {
+	// Pop the last marked position and return the corresponding substring
+	if len(t.markStack) == 0 {
+		return ""
+	}
+	n1 := len(t.markStack) - 1
+	start := t.markStack[n1]
+	t.markStack = t.markStack[:n1]
+	t.lineNoStack = t.lineNoStack[:n1]
+	t.lineColStack = t.lineColStack[:n1]
+	return t.input[start:t.position]
+}
+
+// hasMoreInput checks whether there is any remaining input to be processed.
+// It returns true if the current position has not reached the end of the input
+// string, indicating that there is more content to tokenize.
+func (t *Tokenizer) hasMoreInput() bool {
+	return t.position < len(t.input)
+}
+
+func (t *Tokenizer) tryConsumeRune(char rune) bool {
+	// Check if the next rune matches the given character
+	r, ok := t.peek()
+	if !ok {
+		return false // End of input
+	}
+	if r != char {
+		return false // No match
+	}
+	t.consume() // Consume the character
+	return true
+}
+
+func (t *Tokenizer) readRestOfLine() string {
+	// Read the rest of the line until a newline or end of input
+	var text strings.Builder
+	for t.hasMoreInput() {
+		r, _ := t.peek()
+		if r == '\n' || r == '\r' {
+			break // End of line
+		}
+		text.WriteRune(t.consume())
+	}
+	t.tryConsumeNewline()
+	return text.String()
+}
+
+func (t *Tokenizer) tryConsumeNewline() bool {
+	// Consume '\r' and optionally '\n' to handle both '\n' and '\r\n' line endings.
+	// IMPORTANT: This direct indexing is only safe because we are testing against
+	// the ASCII range. In this range, the UTF-8 encoding is identical to the ASCII.
+	if t.hasMoreInput() && t.input[t.position] == '\r' {
+		t.consume() // Consume '\r'
+		if t.hasMoreInput() && t.input[t.position] == '\n' {
+			t.consume() // Consume '\n' if it follows
+		}
+		return true
+	} else if t.hasMoreInput() && t.input[t.position] == '\n' {
+		t.consume() // Consume '\n'
+		return true
+	}
+	return false // No newline consumed
+}
+
+// Calculates the closing indent if we are on the last line of a multiline string.
+func textIsWhitespaceFollowedBy3Quotes(text string, quote rune) (bool, string) {
+	// Check if the text is whitespace followed by three quotes
+	if len(text) < 3 {
+		return false, ""
+	}
+	var indent strings.Builder
+	whitespace := true
+	count := 0
+	for _, r := range text {
+		if whitespace {
+			if unicode.IsSpace(r) {
+				indent.WriteRune(r)
+				continue
+			} else if r == quote {
+				whitespace = false
+				count++
+			} else {
+				return false, ""
+			}
+		} else {
+			if r == quote {
+				count++
+				if count >= 3 {
+					return true, indent.String()
+				}
+			} else {
+				return false, ""
+			}
+		}
+	}
+	return false, ""
+}
+
+func (t *Tokenizer) tryConsumeText(text string) bool {
+	// Check if the next characters match the given text
+	if strings.HasPrefix(t.input[t.position:], text) {
+		t.consumeN(len(text)) // Consume the matching text
+		return true
+	}
+	return false
+}
+
+func (t *Tokenizer) consumeN(n int) {
+	// Consume n runes from the input
+	for range n {
+		if t.hasMoreInput() {
+			t.consume()
+		} else {
+			break // Stop if we reach the end of input
+		}
+	}
+}
+
+func (t *Tokenizer) skipSpacesUpToNewline() {
+	// Skip whitespace characters
+	for t.hasMoreInput() {
+		r, ok := t.peek()
+		if !ok || r == '\n' || r == '\r' {
+			break
+		}
+		if !unicode.IsSpace(r) {
+			break // Stop if a non-whitespace character is found
+		}
+		t.consume() // Consume the whitespace character
+	}
+}
+
+func (t *Tokenizer) consumeTripleClosingQuotes(quote rune) error {
+	r, b := t.tryReadTripleClosingQuotes()
+	if !b {
+		return fmt.Errorf("Missing triple quotes at line %d, column %d", t.line, t.column)
+	}
+	if r != quote {
+		return fmt.Errorf("Expected %c, but found %c at line %d, column %d", quote, r, t.line, t.column)
+	}
+	return nil
 }

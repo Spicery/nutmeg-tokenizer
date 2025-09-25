@@ -75,7 +75,10 @@ type Token struct {
 	Alias *string   `json:"alias,omitempty"` // The node alias, if any
 
 	// String token fields
-	Value *string `json:"value,omitempty"`
+	QuoteRune rune     `json:"quote,omitempty"`
+	Value     *string  `json:"value,omitempty"`
+	Specifier *string  `json:"specifier,omitempty"`
+	Subtokens []*Token `json:"subtokens,omitempty"`
 
 	// Numeric token fields
 	Radix    *string `json:"radix,omitempty"` // Textual radix prefix (e.g., "0x", "2r", "0t", "" for decimal)
@@ -122,6 +125,32 @@ func NewStringToken(text, value string, span Span) *Token {
 		Type:  StringLiteralTokenType,
 		Span:  span,
 		Value: &value,
+	}
+}
+
+func NewMultiLineStringToken(text, value string, span Span) *Token {
+	return &Token{
+		Text:  text,
+		Type:  StringLiteralTokenType,
+		Span:  span,
+		Value: &value,
+	}
+}
+
+func NewInterpolatedStringToken(text string, subtokens []*Token, span Span) *Token {
+	return &Token{
+		Text:      text,
+		Type:      StringLiteralTokenType,
+		Span:      span,
+		Subtokens: subtokens,
+	}
+}
+
+func NewExpressionToken(text string, span Span) *Token {
+	return &Token{
+		Text: text,
+		Type: StringLiteralTokenType,
+		Span: span,
 	}
 }
 
