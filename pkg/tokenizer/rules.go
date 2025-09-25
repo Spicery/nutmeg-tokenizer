@@ -253,6 +253,11 @@ func getDefaultStartTokens() map[string]StartTokenData {
 			ClosedBy:  []string{"end", "endlet"},
 			Arity:     Many,
 		},
+		"switch": {
+			Expecting: []string{"case", "else"},
+			ClosedBy:  []string{"end", "endswitch"},
+			Arity:     One,
+		},
 		"if": {
 			Expecting: []string{"then"},
 			ClosedBy:  []string{"end", "endif"},
@@ -293,6 +298,11 @@ func getDefaultStartTokens() map[string]StartTokenData {
 
 func getDefaultBridgeTokens() map[string]BridgeTokenData {
 	return map[string]BridgeTokenData{
+		"case": {
+			Expecting: []string{"then"},
+			In:        []string{"switch"},
+			Arity:     One,
+		},
 		"=>>": {
 			Expecting: []string{"end", "enddef", "endfn"},
 			In:        []string{"def"},
@@ -304,8 +314,8 @@ func getDefaultBridgeTokens() map[string]BridgeTokenData {
 			Arity:     Many,
 		},
 		"then": {
-			Expecting: []string{"elseif", "else", "end", "endif", "endifnot"},
-			In:        []string{"if", "ifnot"},
+			Expecting: []string{"case", "elseif", "else", "end", "endif", "endifnot", "endswitch", "endcase"},
+			In:        []string{"if", "ifnot", "switch"},
 			Arity:     Many,
 		},
 		"elseif": {
@@ -319,9 +329,14 @@ func getDefaultBridgeTokens() map[string]BridgeTokenData {
 			Arity:     Many,
 		},
 		"else": {
-			Expecting: []string{"end", "endif", "endifnot"},
-			In:        []string{"if", "ifnot"},
+			Expecting: []string{"end", "endif", "endifnot", "endswitch", "endcase"},
+			In:        []string{"if", "ifnot", "switch"},
 			Arity:     Many,
+		},
+		"endcase": {
+			Expecting: []string{"end", "endswitch"},
+			In:        []string{"switch"},
+			Arity:     Zero,
 		},
 		"catch": {
 			Expecting: []string{},
