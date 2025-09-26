@@ -229,6 +229,15 @@ func NewStartToken(text string, expecting, closedBy []string, span Span, arity A
 	}
 }
 
+func NewPrefixToken(text string, tokenType TokenType, span Span, arity Arity) *Token {
+	return &Token{
+		Text:  text,
+		Type:  tokenType,
+		Span:  span,
+		Arity: &arity,
+	}
+}
+
 // NewOperatorToken creates a new operator token with precedence values.
 func NewOperatorToken(text string, prefix, infix, postfix int, span Span) *Token {
 	token := &Token{

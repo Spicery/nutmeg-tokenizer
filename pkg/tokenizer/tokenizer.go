@@ -26,7 +26,7 @@ type Tokenizer struct {
 // Regular expressions for token matching
 var (
 	identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*`)
-	operatorRegex   = regexp.MustCompile(`^[.\*/%\+\-<>~!&^|?=:]+`)
+	operatorRegex   = regexp.MustCompile(`^[.\*/%\+\-<>~!&^|?=:$]+`)
 	radixRegex      = regexp.MustCompile(`^(\d+[xobtr])([0-9A-Z]+(?:_[0-9A-Z]+)*)(\.[0-9A-Z]*(?:_[0-9A-Z]+)*)?(?:e([+-]?\d+))?`)
 	decimalRegex    = regexp.MustCompile(`^(\d+(?:_\d+)*)(\.\d*(?:_\d+)*)?(?:e([+-]?\d+))?`)
 	commentRegex    = regexp.MustCompile(`^###.*`)
@@ -44,6 +44,10 @@ type BridgeTokenData struct {
 	Expecting []string
 	In        []string
 	Arity     Arity
+}
+
+type PrefixTokenData struct {
+	Arity Arity
 }
 
 // Base precedence values for operator characters (from operators.md)
@@ -505,8 +509,10 @@ func (t *Tokenizer) matchCustomRules() *Token {
 		return NewStmntBridgeToken(text, bridgeData.Expecting, bridgeData.In, span)
 
 	case CustomPrefix:
+		prefixData := entry.Data.(PrefixTokenData)
+
 		t.advance(len(text))
-		return NewToken(text, PrefixTokenType, span)
+		return NewPrefixToken(text, PrefixTokenType, span, prefixData.Arity)
 
 	case CustomMark:
 		t.advance(len(text))
