@@ -12,6 +12,7 @@ const (
 	// Literal constants
 	NumericLiteralTokenType     TokenType = "n" // Numeric literals with radix support
 	StringLiteralTokenType      TokenType = "s" // String literals with quotes and escapes
+	MultiLineStringTokenType    TokenType = "m" // String literals with quotes and escapes
 	InterpolatedStringTokenType TokenType = "i" // Interpolated string literals e.g. `Hello, \(name)!`
 	ExpressionTokenType         TokenType = "e" // Expression tokens (e.g., (1 + 2))
 
@@ -146,7 +147,7 @@ func NewStringToken(text, value string, span Span) *Token {
 func NewMultiLineStringToken(text, value string, span Span) *Token {
 	return &Token{
 		Text:  text,
-		Type:  StringLiteralTokenType,
+		Type:  MultiLineStringTokenType,
 		Span:  span,
 		Value: &value,
 	}
