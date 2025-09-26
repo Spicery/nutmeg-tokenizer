@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -16,6 +17,9 @@ func (t *Tokenizer) matchString() (*Token, error) {
 
 	r, ok := t.peek()
 	if !ok || !isOpeningQuoteChar(r) {
+		if r == '@' {
+			return t.matchRawString()
+		}
 		return nil, nil
 	}
 
@@ -24,6 +28,54 @@ func (t *Tokenizer) matchString() (*Token, error) {
 		return t.readMultilineString(false)
 	}
 	return t.readString(false, r)
+}
+
+func (t *Tokenizer) matchRawString() (*Token, error) {
+	t.consume() // Consume the '@'
+	tagText := ""
+	r, ok := t.peek()
+	if ok && (unicode.IsLetter(r) || r == '_') {
+		tagText = t.takeTagText()
+	}
+	r, ok = t.peek()
+	if ok && isOpeningQuoteChar(r) {
+		_, is_triple := t.tryPeekTripleOpeningQuotes()
+		var token *Token
+		var terr error
+		if is_triple {
+			token, terr = t.readMultilineString(true)
+		} else {
+			token, terr = t.readRawString(false, r)
+		}
+		if terr != nil {
+			return token, terr
+		}
+		if token.Specifier != nil && tagText != "" && *token.Specifier != tagText {
+			return nil, fmt.Errorf("tag specifier '%s' does not match existing specifier '%s' at line %d, column %d", tagText, *token.Specifier, t.line, t.column)
+		}
+		if tagText != "" {
+			token.Specifier = &tagText
+		}
+		return token, nil
+	} else {
+		return nil, fmt.Errorf("expected string after @ at line %d, column %d", t.line, t.column)
+	}
+}
+
+// TODO: I think this is a repeat of readSpecifier
+func (t *Tokenizer) takeTagText() string {
+	var text strings.Builder
+
+	for t.hasMoreInput() {
+		r, _ := t.peek()
+		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_') {
+			break // Stop if the character is not part of an identifier
+		}
+		t.consume() // Consume the character
+		text.WriteRune(r)
+	}
+
+	return text.String()
 }
 
 func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error) {
