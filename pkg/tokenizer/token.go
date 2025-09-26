@@ -10,8 +10,10 @@ type TokenType string
 
 const (
 	// Literal constants
-	NumericLiteralTokenType TokenType = "n" // Numeric literals with radix support
-	StringLiteralTokenType  TokenType = "s" // String literals with quotes and escapes
+	NumericLiteralTokenType     TokenType = "n" // Numeric literals with radix support
+	StringLiteralTokenType      TokenType = "s" // String literals with quotes and escapes
+	InterpolatedStringTokenType TokenType = "i" // Interpolated string literals e.g. `Hello, \(name)!`
+	ExpressionTokenType         TokenType = "e" // Expression tokens (e.g., (1 + 2))
 
 	// Identifier tokens
 	StartTokenType    TokenType = "S" // Form start tokens (def, if, while)
@@ -161,9 +163,10 @@ func NewInterpolatedStringToken(text string, subtokens []*Token, span Span) *Tok
 
 func NewExpressionToken(text string, span Span) *Token {
 	return &Token{
-		Text: text,
-		Type: StringLiteralTokenType,
-		Span: span,
+		Text:  text,
+		Type:  ExpressionTokenType,
+		Span:  span,
+		Value: &text,
 	}
 }
 

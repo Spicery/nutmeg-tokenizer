@@ -670,7 +670,7 @@ func (t *Tokenizer) consume() rune {
 	if !ok {
 		return r
 	}
-	t.position += utf8.RuneLen(r) // Move the byte position forward
+	t.advance(utf8.RuneLen(r)) // Move the byte position forward
 	return r
 }
 

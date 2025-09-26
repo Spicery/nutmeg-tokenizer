@@ -81,6 +81,7 @@ func (t *Tokenizer) takeTagText() string {
 func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error) {
 	start_position := t.position
 	startLine, startCol := t.line, t.column
+	currPosition := t.position
 	currSpan := Span{Position{startLine, startCol}, Position{-1, -1}}
 	quote := default_quote
 	if !unquoted {
@@ -93,6 +94,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 		if !t.hasMoreInput() {
 			return nil, fmt.Errorf("unterminated string at line %d, column %d", startLine, startCol)
 		}
+		beforeBackSlash := Position{t.line, t.column}
 		r := t.consume()
 		if !unquoted && r == quote { // Closing quote found
 			break
@@ -102,8 +104,10 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 			if next == '(' || next == '[' || next == '{' {
 				// End the current StringToken and handle interpolation
 				if value.Len() > 0 {
-					currSpan.End.Line, currSpan.End.Col = t.line, t.column-1 // Do not include the backslash
-					current := NewStringToken("", value.String(), currSpan)
+					textString := t.input[currPosition:t.position]
+					currSpan.End = beforeBackSlash
+					valueString := value.String()
+					current := NewStringToken(textString, valueString, currSpan)
 					current.SetQuote(quote)
 					interpolationTokens = append(interpolationTokens, current)
 					value.Reset()
@@ -113,6 +117,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 					return nil, err
 				}
 				interpolationTokens = append(interpolationTokens, interpolatedToken)
+				currPosition = t.position
 				currSpan = Span{Position{t.line, t.column}, Position{-1, -1}}
 			} else {
 				value.WriteString(handleEscapeSequence(t))
@@ -132,8 +137,9 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 
 	// Add the final StringToken if there's remaining text
 	if value.Len() > 0 {
+		textString := t.input[currPosition:t.position]
 		currSpan.End.Line, currSpan.End.Col = t.line, t.column
-		token := NewStringToken("", value.String(), currSpan)
+		token := NewStringToken(textString, value.String(), currSpan)
 		token.SetQuote(quote)
 		interpolationTokens = append(interpolationTokens, token)
 	}
@@ -151,6 +157,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 	// Combine into a StringInterpolationToken if interpolation occurred
 	compoundToken := NewInterpolatedStringToken(text, interpolationTokens, Span{Position{startLine, startCol}, Position{t.line, t.column}})
 	compoundToken.SetQuote(quote)
+	compoundToken.Type = InterpolatedStringTokenType
 	return compoundToken, nil
 }
 
