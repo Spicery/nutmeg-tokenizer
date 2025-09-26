@@ -39,7 +39,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 
 	for {
 		if !t.hasMoreInput() {
-			return nil, fmt.Errorf("Unterminated string at line %d, column %d", startLine, startCol)
+			return nil, fmt.Errorf("unterminated string at line %d, column %d", startLine, startCol)
 		}
 		r := t.consume()
 		if !unquoted && r == quote { // Closing quote found
@@ -52,7 +52,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 				if value.Len() > 0 {
 					currSpan.End.Line, currSpan.End.Col = t.line, t.column-1 // Do not include the backslash
 					current := NewStringToken("", value.String(), currSpan)
-					current.QuoteRune = quote
+					current.SetQuote(quote)
 					interpolationTokens = append(interpolationTokens, current)
 					value.Reset()
 				}
@@ -72,7 +72,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 				}
 				break
 			}
-			return nil, fmt.Errorf("Line break in string, at line %d, column %d", startLine, startCol)
+			return nil, fmt.Errorf("line break in string, at line %d, column %d", startLine, startCol)
 		} else {
 			value.WriteRune(r)
 		}
@@ -82,7 +82,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 	if value.Len() > 0 {
 		currSpan.End.Line, currSpan.End.Col = t.line, t.column
 		token := NewStringToken("", value.String(), currSpan)
-		token.QuoteRune = quote
+		token.SetQuote(quote)
 		interpolationTokens = append(interpolationTokens, token)
 	}
 
@@ -98,7 +98,7 @@ func (t *Tokenizer) readString(unquoted bool, default_quote rune) (*Token, error
 
 	// Combine into a StringInterpolationToken if interpolation occurred
 	compoundToken := NewInterpolatedStringToken(text, interpolationTokens, Span{Position{startLine, startCol}, Position{t.line, t.column}})
-	compoundToken.QuoteRune = quote
+	compoundToken.SetQuote(quote)
 	return compoundToken, nil
 }
 
@@ -118,7 +118,7 @@ func (t *Tokenizer) readStringInterpolation() (*Token, error) {
 
 	for {
 		if !t.hasMoreInput() {
-			return nil, fmt.Errorf("Unterminated interpolation, at line %d, Column: %d", span.Start.Line, span.Start.Col)
+			return nil, fmt.Errorf("unterminated interpolation, at line %d, Column: %d", span.Start.Line, span.Start.Col)
 		}
 		r := t.consume()
 		switch state {
@@ -138,13 +138,13 @@ func (t *Tokenizer) readStringInterpolation() (*Token, error) {
 						return token, nil
 					}
 				} else {
-					return nil, fmt.Errorf("Mismatched bracket, at line %d, Column: %d", span.Start.Line, span.Start.Col)
+					return nil, fmt.Errorf("mismatched bracket, at line %d, Column: %d", span.Start.Line, span.Start.Col)
 				}
 			case '"', '\'', '`', '«': // Enter string state
 				stack = append(stack, getMatchingCloseQuote(r))
 				state = 1
 			case 'r', '\n': // Line breaks are not allowed
-				return nil, fmt.Errorf("Line break in interpolation, at line %d, Column: %d", t.line, t.column)
+				return nil, fmt.Errorf("line break in interpolation, at line %d, Column: %d", t.line, t.column)
 			}
 		case 1: // Inside string
 			switch r {
@@ -160,7 +160,7 @@ func (t *Tokenizer) readStringInterpolation() (*Token, error) {
 						handleEscapeSequence(t)
 					}
 				} else {
-					return nil, fmt.Errorf("Unterminated escape sequence, at line %d, Column: %d", span.Start.Line, span.Start.Col)
+					return nil, fmt.Errorf("unterminated escape sequence, at line %d, Column: %d", span.Start.Line, span.Start.Col)
 				}
 			case stack[len(stack)-1]: // Matching closing quote
 				stack = stack[:len(stack)-1] // Pop stack
@@ -267,7 +267,7 @@ func (t *Tokenizer) readMultilineString(rawFlag bool) (*Token, error) {
 			}
 		} else {
 			tok = NewStringToken("", "", Span{Position{t.line, t.column}, Position{t.line, t.column}})
-			tok.QuoteRune = openingQuote
+			tok.SetQuote(openingQuote)
 		}
 		subTokens = append(subTokens, tok)
 	}
@@ -285,7 +285,7 @@ func (t *Tokenizer) readMultilineString(rawFlag bool) (*Token, error) {
 	// Add the multiline string token
 	token := NewMultiLineStringToken(originalText, "", Span{Position{startLine, startCol}, Position{t.line, t.column}})
 	token.Specifier = &specifier
-	token.QuoteRune = openingQuote
+	token.SetQuote(openingQuote)
 	token.Subtokens = subTokens
 
 	return token, nil
@@ -297,7 +297,7 @@ func (t *Tokenizer) findClosingIndent() (rune, string, string, int, error) {
 	// Validate and consume the opening triple quotes
 	opening_quote, ok := t.tryReadTripleOpeningQuotes()
 	if !ok {
-		return 0, "", "", 0, fmt.Errorf("Malformed opening triple quotes at line %d, column %d", t.line, t.column)
+		return 0, "", "", 0, fmt.Errorf("malformed opening triple quotes at line %d, column %d", t.line, t.column)
 	}
 	closing_quote := getMatchingCloseQuote(opening_quote) // Get the matching closing quote
 
@@ -322,7 +322,7 @@ func (t *Tokenizer) findClosingIndent() (rune, string, string, int, error) {
 	}
 
 	if !match {
-		return 0, "", "", 0, fmt.Errorf("Closing triple quote not found at line %d, column %d", t.line, t.column)
+		return 0, "", "", 0, fmt.Errorf("closing triple quote not found at line %d, column %d", t.line, t.column)
 	}
 
 	for i, line := range lines {
@@ -364,14 +364,14 @@ func (t *Tokenizer) readSpecifier() (string, error) {
 	}
 	strtext := strings.TrimSpace(text.String())
 	if strings.Contains(strtext, " ") {
-		return "", fmt.Errorf("Spaces inside code-fence specifier at line %d, column %d", t.line, t.column)
+		return "", fmt.Errorf("spaces inside code-fence specifier at line %d, column %d", t.line, t.column)
 	}
 	//  Check the specifier matches the regex ^\w*$. This reserves wriggle room
 	//  for future expansion.
 	if len(strtext) > 0 {
 		m, e := regexp.MatchString(`^[a-zA-Z_]\w*$`, strtext)
 		if !m || e != nil {
-			return "", fmt.Errorf("Invalid code-fence specifier at line %d, column %d", t.line, t.column)
+			return "", fmt.Errorf("invalid code-fence specifier at line %d, column %d", t.line, t.column)
 		}
 	}
 	return strtext, nil
@@ -388,7 +388,7 @@ func (t *Tokenizer) readRawString(unquoted bool, default_quote rune) (*Token, er
 
 	for {
 		if !t.hasMoreInput() {
-			return nil, fmt.Errorf("Unterminated raw string at line %d, column %d", startLine, startCol)
+			return nil, fmt.Errorf("unterminated raw string at line %d, column %d", startLine, startCol)
 		}
 		r := t.consume()
 		if r == quote { // Closing quote found
@@ -400,7 +400,7 @@ func (t *Tokenizer) readRawString(unquoted bool, default_quote rune) (*Token, er
 				}
 				break
 			}
-			return nil, fmt.Errorf("Line break in raw string at line %d, column %d", startLine, startCol)
+			return nil, fmt.Errorf("line break in raw string at line %d, column %d", startLine, startCol)
 		}
 		// Backslashes are treated as normal characters in raw strings
 		text.WriteRune(r)
@@ -409,6 +409,6 @@ func (t *Tokenizer) readRawString(unquoted bool, default_quote rune) (*Token, er
 	// Add the raw string token
 	originalText := t.input[startPosition:t.position]
 	token := NewStringToken(originalText, text.String(), Span{Position{startLine, startCol}, Position{t.line, t.column}})
-	token.QuoteRune = quote
+	token.SetQuote(quote)
 	return token, nil
 }

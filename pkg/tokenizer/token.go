@@ -75,7 +75,7 @@ type Token struct {
 	Alias *string   `json:"alias,omitempty"` // The node alias, if any
 
 	// String token fields
-	QuoteRune rune     `json:"quote,omitempty"`
+	Quote     string   `json:"quote,omitempty"`
 	Value     *string  `json:"value,omitempty"`
 	Specifier *string  `json:"specifier,omitempty"`
 	Subtokens []*Token `json:"subtokens,omitempty"`
@@ -107,6 +107,19 @@ type Token struct {
 	// Newline tracking fields
 	LnBefore *bool `json:"ln_before,omitempty"` // True if token was preceded by a newline
 	LnAfter  *bool `json:"ln_after,omitempty"`  // True if token was followed by a newline
+}
+
+func (t *Token) SetQuote(r rune) {
+	switch r {
+	case '\'':
+		t.Quote = "single"
+	case '"':
+		t.Quote = "double"
+	case '`':
+		t.Quote = "backtick"
+	default:
+		t.Quote = string(r)
+	}
 }
 
 // NewToken creates a new token with the basic required fields.

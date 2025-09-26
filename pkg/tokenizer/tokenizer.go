@@ -831,10 +831,10 @@ func (t *Tokenizer) skipSpacesUpToNewline() {
 func (t *Tokenizer) consumeTripleClosingQuotes(quote rune) error {
 	r, b := t.tryReadTripleClosingQuotes()
 	if !b {
-		return fmt.Errorf("Missing triple quotes at line %d, column %d", t.line, t.column)
+		return fmt.Errorf("missing triple quotes at line %d, column %d", t.line, t.column)
 	}
 	if r != quote {
-		return fmt.Errorf("Expected %c, but found %c at line %d, column %d", quote, r, t.line, t.column)
+		return fmt.Errorf("expected %c, but found %c at line %d, column %d", quote, r, t.line, t.column)
 	}
 	return nil
 }
